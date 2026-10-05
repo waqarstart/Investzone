@@ -1,54 +1,75 @@
-export interface JoinStep {
-  id: string
-  label: string
-  eyebrow: string
-  heading: string
-  helper: string
+export type StepKey =
+  | "registration"
+  | "basic"
+  | "document"
+  | "verification"
+  | "selfie"
+  | "address";
+
+export type StepStatus = "not_started" | "completed" | "skipped";
+export type KycStatus = "not_started" | "in_progress" | "skipped" | "verified";
+
+export interface StepMeta {
+  key: StepKey;
+  label: string;
+  eyebrow: string;
+  heading: string;
+  helper: string;
 }
 
-export const STEPS: readonly JoinStep[] = [
+export const STEPS: StepMeta[] = [
   {
-    id: "name",
-    label: "Your name",
-    eyebrow: "NAME",
-    heading: "What's your name?",
-    helper: "Use the name you'd like other members to see.",
+    key: "registration",
+    label: "Registration",
+    eyebrow: "REGISTRATION",
+    heading: "Create your account",
+    helper: "Start with the basics. KYC comes next.",
   },
   {
-    id: "contact",
-    label: "Contact details",
-    eyebrow: "DIRECT CHANNEL",
-    heading: "How can we reach you?",
-    helper: "We'll send a 6-digit confirmation code to verify your direct access line.",
+    key: "basic",
+    label: "Basic information",
+    eyebrow: "BASIC INFORMATION",
+    heading: "Tell us about you",
+    helper: "Enter your details exactly as they appear on your ID.",
   },
   {
-    id: "verification",
+    key: "document",
+    label: "Identity document",
+    eyebrow: "IDENTITY DOCUMENT",
+    heading: "Upload your ID",
+    helper: "Choose a document and upload clear photos of it.",
+  },
+  {
+    key: "verification",
     label: "Verification",
-    eyebrow: "VERIFICATION",
-    heading: "Enter your code",
-    helper: "We sent a 6-digit code to {contact}.",
+    eyebrow: "IDENTITY VERIFICATION",
+    heading: "Verifying your identity",
+    helper: "This usually takes a few seconds.",
   },
   {
-    id: "security",
-    label: "Security",
-    eyebrow: "SECURITY",
-    heading: "Quick security check",
-    helper: "Confirm you're human to protect Bridgeway members.",
+    key: "selfie",
+    label: "Selfie check",
+    eyebrow: "SELFIE CHECK",
+    heading: "Take a live selfie",
+    helper: "We'll compare it with the photo on your ID.",
   },
   {
-    id: "location",
-    label: "Location",
-    eyebrow: "LOCATION",
-    heading: "Where are you based?",
-    helper: "This helps us match you with people near you.",
+    key: "address",
+    label: "Address proof",
+    eyebrow: "ADDRESS PROOF",
+    heading: "Verify your address",
+    helper: "Upload a document that shows your current address.",
   },
-  {
-    id: "role",
-    label: "Join as",
-    eyebrow: "ROLE",
-    heading: "How will you use Bridgeway?",
-    helper: "Pick the role that fits you best. You can add more later.",
-  },
-]
+];
 
-export const STEP_COUNT = STEPS.length
+/** When false, the address step is optional and can be completed without an upload. */
+export const ADDRESS_VERIFICATION_REQUIRED = true;
+
+export const INITIAL_STEP_STATUS: Record<StepKey, StepStatus> = {
+  registration: "not_started",
+  basic: "not_started",
+  document: "not_started",
+  verification: "not_started",
+  selfie: "not_started",
+  address: "not_started",
+};

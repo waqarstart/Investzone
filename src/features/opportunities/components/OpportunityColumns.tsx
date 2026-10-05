@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { useFilteredMandates, useFilteredRaises } from "../useOpportunitiesStore";
 import { FoundersColumn } from "./FoundersColumn";
 import { InvestorsColumn } from "./InvestorsColumn";
+import { useRole } from "@/lib/storage";
 
 type Tab = "investors" | "founders";
 
@@ -14,6 +15,8 @@ export function OpportunityColumns() {
     { key: "investors", label: `Investors (${mandates})` },
     { key: "founders", label: `Founders (${raises})` },
   ];
+
+  const role = useRole();
 
   return (
     <div>
@@ -34,13 +37,19 @@ export function OpportunityColumns() {
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-6">
+        {
+          role !== 'founder' ? <div>
+        
         <div className={cn("min-w-0", tab === "investors" ? "block" : "hidden", "lg:block")}>
           <InvestorsColumn />
         </div>
+        </div> : <div>
         <div className={cn("min-w-0", tab === "founders" ? "block" : "hidden", "lg:block")}>
           <FoundersColumn />
         </div>
+        </div>
+}
       </div>
     </div>
   );

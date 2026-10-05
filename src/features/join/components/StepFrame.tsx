@@ -1,109 +1,78 @@
-import { useEffect } from "react"
-import type { ReactNode } from "react"
-import { useReducedMotion } from "motion/react"
-import { LoaderCircle } from "lucide-react"
-import { STEPS } from "@/features/join/steps"
-import { cn } from "@/lib/utils"
-
-interface StepAutoFocusProps {
-  stepIndex: number
-}
-
-export function StepAutoFocus({ stepIndex }: StepAutoFocusProps) {
-  const reduced = useReducedMotion()
-
-  useEffect(() => {
-    if (stepIndex === 0) return
-
-    const id = window.setTimeout(() => {
-      const card = document.getElementById("join-step-card")
-      if (!card) return
-
-      if (window.matchMedia("(max-width: 1023px)").matches) {
-        card.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" })
-      }
-
-      const target = card.querySelector<HTMLElement>(
-        'input:not([type="hidden"]), select, textarea',
-      )
-      if (target) target.focus({ preventScroll: true })
-      else card.focus({ preventScroll: true })
-    }, 30)
-
-    return () => window.clearTimeout(id)
-  }, [stepIndex, reduced])
-
-  return null
-}
-
+import { Loader2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 interface StepFrameProps {
-  stepIndex: number
-  helper: string
-  children: ReactNode
-  continueLabel: string
-  continueDisabled?: boolean
-  continueBlocked?: boolean
-  isLoading?: boolean
-  canPrevious?: boolean
-  onPrevious: () => void
+  eyebrow: string;
+  heading: string;
+  helper: string;
+  children: ReactNode;
+  continueLabel: string;
+  continueDisabled?: boolean;
+  isLoading?: boolean;
+  canPrevious?: boolean;
+  onPrevious?: () => void;
+  canSkip?: boolean;
+  onSkip?: () => void;
 }
 
 export function StepFrame({
-  stepIndex,
+  eyebrow,
+  heading,
   helper,
   children,
   continueLabel,
   continueDisabled = false,
-  continueBlocked = false,
   isLoading = false,
-  canPrevious = true,
+  canPrevious = false,
   onPrevious,
+  canSkip = false,
+  onSkip,
 }: StepFrameProps) {
-  const step = STEPS[stepIndex]
-
   return (
-    <div className="flex flex-1 flex-col px-6 py-8 sm:px-10 md:px-11 md:py-12">
-      <div>
-        <p className="text-sm font-semibold uppercase tracking-[0.08em] text-[#64748B]">
-          Step {stepIndex + 1} of {STEPS.length} &middot; {step.eyebrow}
-        </p>
-        <h1 className="mt-4 font-['Playfair_Display'] text-[30px] font-bold leading-tight text-[#14213D] sm:text-[38px]">
-          {step.heading}
-        </h1>
-        <p className="mt-2 max-w-xl text-base leading-relaxed text-[#475569]">{helper}</p>
+    <div className="flex h-full flex-1 flex-col">
+      <div className="flex-1 px-5 pb-6 pt-8 sm:px-14 sm:pt-14">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 sm:text-sm">{eyebrow}</p>
+        <h2 className="mt-4 font-display text-[30px] font-bold leading-tight text-[#14213D] sm:text-[44px]">
+          {heading}
+        </h2>
+        <p className="mt-2 text-base text-slate-600 sm:text-lg">{helper}</p>
+        <div className="mt-8">{children}</div>
       </div>
 
-      <div className="mt-8 flex-1">
-        <StepAutoFocus stepIndex={stepIndex} />
-        {children}
-      </div>
-
-      <div className="mt-10 flex flex-col-reverse gap-3 border-t border-[#E9EDF2] pt-6 sm:flex-row sm:items-center sm:justify-between">
-        <button
-          type="button"
-          onClick={onPrevious}
-          disabled={!canPrevious}
-          className="rounded-full px-5 py-3 text-sm font-semibold text-[#475569] transition-colors hover:bg-[#F1F5F9] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#94A3B8]/30 disabled:pointer-events-none disabled:opacity-40"
-        >
-          ←&nbsp; Previous
-        </button>
-
-        <button
+      <div className="flex flex-col-reverse gap-3 border-t border-[#E5E7EB] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-14 sm:py-6">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {canPrevious && (
+            <button
+              type="button"
+              onClick={onPrevious}
+              disabled={isLoading}
+              className="h-11 whitespace-nowrap text-base font-semibold text-slate-600 hover:text-[#14213D] disabled:opacity-50"
+            >
+              ← Previous
+            </button>
+          )}
+          {canSkip && (
+            <button
+              type="button"
+              onClick={onSkip}
+              disabled={isLoading}
+              className="h-11 whitespace-nowrap text-sm font-semibold text-[#3F4FA0] hover:underline disabled:opacity-50"
+            >
+              Skip KYC for now
+            </button>
+          )}
+        </div>
+        <Button
           type="submit"
           disabled={continueDisabled || isLoading}
-          aria-disabled={continueBlocked || continueDisabled || isLoading}
-          className={cn(
-            "inline-flex h-14 items-center justify-center gap-2 rounded-xl px-8 text-base font-semibold text-[#14213D] transition-all focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#F5B544]/40 disabled:cursor-not-allowed disabled:opacity-60",
-            (continueBlocked || continueDisabled) && !isLoading
-              ? "bg-[#F5B544] hover:bg-[#E9A92F]"
-              : "bg-[#F5B544] hover:bg-[#E9A92F]",
-          )}
+          className="h-14 whitespace-nowrap rounded-xl bg-[#F5B544] px-8 text-base font-semibold text-[#14213D] hover:bg-[#E9A72F] disabled:opacity-60 sm:min-w-[200px]"
         >
-          {isLoading ? <LoaderCircle className="size-4 animate-spin" /> : null}
-          {continueLabel} &nbsp;→
-        </button>
+          {isLoading ? <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" /> : null}
+          {continueLabel}
+          {!isLoading && <span aria-hidden="true">&nbsp;→</span>}
+        </Button>
       </div>
     </div>
-  )
+  );
 }

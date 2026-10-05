@@ -1,0 +1,29 @@
+import { useState } from 'react'
+import { BarChart3, Eye, FileText, Info, LockKeyhole, SlidersHorizontal, Zap } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
+import { suggestions } from '../data'
+
+export function SuggestedCard() {
+  const [following, setFollowing] = useState<string[]>([])
+  return <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-[0_3px_14px_rgba(20,33,61,0.06)]"><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Suggested for you</h2><span title="Based on your sector and preferences"><Info className="size-4 text-[#94A3B8]" /></span></div><div className="space-y-1">{suggestions.map((item, index) => { const active = following.includes(item.name); return <div key={item.name} className="flex min-w-0 items-center gap-2 py-2"><span className={`grid size-10 shrink-0 place-items-center rounded-full text-xs font-bold ${index === 2 ? 'border border-[#F5B544] bg-[#FEF3D8] text-[#8A5A00]' : 'bg-[#14213D] text-white'}`}>{item.initials}</span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{item.name}</p><p className="line-clamp-2 text-[10px] leading-tight text-[#64748B]">{item.detail}</p></div><button onClick={() => setFollowing((items) => active ? items.filter((name) => name !== item.name) : [...items, item.name])} className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-semibold ${active ? 'border border-[#3F4FA0] bg-white text-[#3F4FA0]' : 'bg-[#EEF0FA] text-[#3F4FA0]'}`}>{active ? 'Following' : '+ Follow'}</button></div> })}</div><Link to="/connections" className="mt-2 block border-t border-[#F1F3F6] pt-3 text-xs font-bold text-[#3F4FA0]">View all recommendations →</Link></section>
+}
+
+const notices = [
+  { Icon: LockKeyhole, color: 'bg-[#E0F2FE] text-[#5BA4E6]', text: <><b>Amina Qureshi</b> approved your bilateral NDA access for <b>AgriFlow Seed Data Room.</b></>, time: '15m ago', action: 'View Data Room →' },
+  { Icon: FileText, color: 'bg-[#F0EAFE] text-[#7C5CBF]', text: <><b>Apex Capital</b> invited your syndicate to review a <b>$250K allocation tranche</b> in PayMatrix Global.</>, time: '1h ago', action: 'Review Pitch' },
+  { Icon: BarChart3, color: 'bg-[#E7EBFF] text-[#3F4FA0]', text: <><b>HealthBridge AI</b> updated stage to <b>Negotiation.</b> Legal due diligence memo uploaded.</>, time: '3h ago' },
+  { Icon: Eye, color: 'bg-[#FEF3D8] text-[#d98b00]', text: <><b>Zainab Bilal</b> (CTO @ HealthBridge AI) viewed your investor mandate.</>, time: 'Yesterday' },
+]
+export function NotificationsCard() {
+  const [unreadOnly, setUnreadOnly] = useState(false)
+  return <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-[0_3px_14px_rgba(20,33,61,0.06)]"><div className="mb-2 flex items-center gap-2"><h2 className="text-sm font-bold">Recent Notifications</h2><span className="rounded-full bg-[#FFF0ED] px-2.5 py-0.5 text-[10px] font-bold text-[#F2705A]">3 New</span><button onClick={() => setUnreadOnly((value) => !value)} title="Toggle unread only" aria-label="Toggle unread only" className={`ml-auto rounded p-1 ${unreadOnly ? 'bg-[#EEF0FA] text-[#3F4FA0]' : 'text-[#94A3B8]'}`}><SlidersHorizontal className="size-4" /></button></div><div className="space-y-2">{notices.slice(0, unreadOnly ? 3 : 4).map(({ Icon, color, text, time, action }, index) => <div key={time} className="flex gap-2.5 py-1"><span className={`grid size-9 shrink-0 place-items-center rounded-full ${color}`}><Icon className="size-4" /></span><div className="min-w-0 flex-1"><p className="text-[11px] leading-snug text-[#334155]">{text}</p><div className="mt-1 flex min-h-5 items-center justify-between gap-2"><span className="text-[10px] text-[#94A3B8]">{time}</span>{action && <button onClick={() => toast(index === 0 ? 'Data room is opening (demo)' : 'Review pitch is coming soon (demo)')} className={action.startsWith('Review') ? 'rounded bg-[#3F4FA0] px-2 py-1 text-[9px] font-semibold text-white' : 'text-[10px] font-semibold text-[#3F4FA0]'}>{action}</button>}</div></div></div>)}</div><Link to="/notifications" className="mt-2 block border-t border-[#F1F3F6] pt-3 text-xs font-bold text-[#3F4FA0]">See all notifications →</Link></section>
+}
+
+export function IntelligenceCard() {
+  return <section className="relative overflow-hidden rounded-2xl bg-[#14213D] p-5 text-white"><div className="absolute -bottom-20 -right-10 size-48 rounded-full border-4 border-[#F5B544]" /><div className="absolute -bottom-24 -right-16 size-56 rounded-full border border-dashed border-white/80" /><div className="relative"><div className="flex items-center gap-1.5 text-[11px] font-bold tracking-wide text-[#F5B544]"><Zap className="size-4 fill-current" /> INTELLIGENCE DESK</div><h2 className="mt-3 text-lg font-bold leading-tight">See who's investing in your sector</h2><p className="mt-2 text-xs leading-relaxed text-[#CBD5E1]">Access live LP syndicates, term sheet benchmarks, and bilateral introduction channels.</p><button onClick={() => toast('Deal intelligence is coming soon (demo)')} className="mt-4 w-full rounded-xl bg-[#F5B544] px-3 py-3 text-xs font-bold text-[#14213D]">Explore Deal Intelligence →</button></div></section>
+}
+
+export function SidebarFooter() {
+  return <footer className="px-2 text-[10px] leading-relaxed text-[#94A3B8]"><div className="flex flex-wrap gap-x-4 gap-y-1"><a href="#" className="hover:text-[#14213D]">About</a><a href="#" className="hover:text-[#14213D]">Privacy & Terms</a><a href="#" className="hover:text-[#14213D]">Help Center</a><a href="#" className="hover:text-[#14213D]">Accessibility</a><a href="#" className="hover:text-[#14213D]">Syndicate Accord</a></div><p className="mt-2">© 2026 Bridgeway Corporation. Bilateral Institutional Deal Network. All Rights Reserved.</p></footer>
+}

@@ -23,5 +23,7 @@ export interface Post {
   comments: number
   engagementScore: number
   createdAt: number
+  imageUrl?: string
+  imageName?: string
   banner?: 'deal' | 'celebration'
 }

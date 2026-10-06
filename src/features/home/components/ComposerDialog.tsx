@@ -1,33 +1,32 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Camera,
   ChevronDown,
+  Clock,
   FileText,
   Globe,
   Hash,
-  Mic,
-  Paperclip,
-  PenLine,
-  Send,
+  Image as ImageIcon,
   Smile,
+  Sparkles,
   Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useJoinStore } from "@/features/join/useJoinStore";
 import { cn } from "@/lib/utils";
 import type { Post } from "../types";
 
 const MAX_LENGTH = 1000;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const HASHTAG = /#[\p{L}\p{N}_]+/gu;
-const HASHTAG_SPLIT = /(#[\p{L}\p{N}_]+)/u;
 
 const EMOJIS = [
   "🚀", "💡", "📈", "🤝", "🎯", "💰", "🌱", "⚡",
@@ -36,17 +35,11 @@ const EMOJIS = [
 ];
 
 const AUDIENCES = [
-  { id: "public", label: "Anyone on Bridgeway", icon: Globe },
-  { id: "connections", label: "My connections", icon: Users },
+  { id: "public", label: "Everyone", icon: Globe },
+  { id: "connections", label: "Only my connections", icon: Users },
 ] as const;
 
 type AudienceId = (typeof AUDIENCES)[number]["id"];
-
-const PLACEHOLDERS: Record<string, string> = {
-  Pitch: "Share your idea or pitch…",
-  Memo: "Write your memo…",
-  "Success story": "Share a deal you closed…",
-};
 
 interface AttachedImage {
   name: string;
@@ -62,6 +55,7 @@ interface ComposerDialogProps {
   onPost: (post: Post) => void;
   preset?: string;
   role?: "Founder" | "Investor";
+  initialPost?: Post | null;
 }
 
 function formatSize(bytes: number): string {
@@ -86,11 +80,13 @@ export function ComposerDialog({
   initials,
   onPost,
   preset,
-  role,
+  role = "Founder",
+  initialPost,
 }: ComposerDialogProps) {
   const [text, setText] = useState("");
   const [audience, setAudience] = useState<AudienceId>("public");
   const [image, setImage] = useState<AttachedImage | null>(null);
+  const [isPosting, setIsPosting] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -99,19 +95,26 @@ export function ComposerDialog({
 
   useEffect(() => {
     if (open) {
-      setText("");
-      setImage(null);
+      if (initialPost) {
+        setText(initialPost.body);
+        setImage(
+          initialPost.imageUrl
+            ? {
+                name: initialPost.imageName || "Attached image",
+                size: 1024 * 500,
+                dataUrl: initialPost.imageUrl,
+              }
+            : null
+        );
+      } else {
+        setText("");
+        setImage(null);
+      }
       setAudience("public");
+      setIsPosting(false);
       setEmojiOpen(false);
     }
-  }, [open]);
-
-  useLayoutEffect(() => {
-    const element = textareaRef.current;
-    if (!element) return;
-    element.style.height = "auto";
-    element.style.height = `${element.scrollHeight}px`;
-  }, [text, open]);
+  }, [open, preset, initialPost]);
 
   useEffect(() => {
     if (!emojiOpen) return undefined;
@@ -123,6 +126,13 @@ export function ComposerDialog({
     document.addEventListener("mousedown", close);
     return () => document.removeEventListener("mousedown", close);
   }, [emojiOpen]);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.max(60, textareaRef.current.scrollHeight)}px`;
+    }
+  }, [text, open]);
 
   const insertAtCursor = (snippet: string) => {
     const element = textareaRef.current;
@@ -142,254 +152,295 @@ export function ComposerDialog({
 
   const handleFile = async (file: File | undefined) => {
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
       toast.error("Please choose a PNG, JPG or WebP image");
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("Image is larger than 5 MB");
+      toast.error("Image must be smaller than 10 MB");
       return;
     }
     try {
       const dataUrl = await readAsDataUrl(file);
       setImage({ name: file.name, size: file.size, dataUrl });
+      toast.success("Image attached");
     } catch {
-      toast.error("Could not read that image");
+      toast.error("Could not read image file");
     }
   };
 
-  const canPost = text.trim().length > 0 || image !== null;
+  const canPost = (text.trim().length > 0 || image !== null) && !isPosting;
 
-  function post() {
+  function handlePublish() {
     if (!canPost) return;
-    const body = text.trim();
-    const tags = Array.from(new Set(body.match(HASHTAG) ?? []));
-    onPost({
-      id: `new-${Date.now()}`,
-      name: author,
-      initials,
-      kind: role === "Founder" ? "founder" : "investor",
-      headline: "Bridgeway member · Network",
-      time: "Just now",
-      body,
-      tags,
-      imageUrl: image?.dataUrl,
-      imageName: image?.name,
-      interested: 0,
-      comments: 0,
-      engagementScore: 0,
-      createdAt: Date.now(),
-    } as Post);
-    onOpenChange(false);
-    toast("Posted (demo)");
+    setIsPosting(true);
+
+    setTimeout(() => {
+      const body = text.trim();
+      const tags = Array.from(new Set(body.match(HASHTAG) ?? []));
+      
+      onPost({
+        id: initialPost?.id || `post-${Date.now()}`,
+        name: author,
+        initials,
+        kind: role === "Founder" ? "founder" : "investor",
+        headline: role === "Founder" ? "Founder & Systems Architect" : "Managing Partner · Syndicate",
+        time: initialPost?.time || "Just now",
+        body,
+        tags,
+        imageUrl: image?.dataUrl,
+        imageName: image?.name,
+        interested: initialPost?.interested || 0,
+        comments: initialPost?.comments || 0,
+        engagementScore: initialPost?.engagementScore || 100,
+        createdAt: initialPost?.createdAt || Date.now(),
+      });
+
+      setIsPosting(false);
+      onOpenChange(false);
+      toast.success(initialPost ? "Post updated successfully!" : "Post shared successfully with your network!");
+    }, 500);
   }
 
   const activeAudience = AUDIENCES.find((item) => item.id === audience) ?? AUDIENCES[0];
   const AudienceIcon = activeAudience.icon;
-  const parts = text.split(HASHTAG_SPLIT);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(470px,calc(100dvh-2rem))] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-w-[640px] [&>button]:hidden">
-        <DialogHeader className="flex-row shrink-0 items-center justify-between space-y-0 border-b border-[#E5E7EB] px-5 py-4 sm:px-6 sm:py-5">
-          <DialogHeader>
-<div className="flex items-center gap-4">
-            <span className="grid size-14 shrink-0 place-items-center rounded-full bg-[#14213D] text-lg font-bold text-white">
+      <DialogContent className="!w-[94vw] !max-w-[740px] sm:!w-[700px] md:!w-[740px] min-h-[460px] max-h-[85vh] flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F0] bg-[#FFFFFF] p-5 sm:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] [&>button]:hidden">
+        <DialogTitle className="sr-only">
+          {initialPost ? "Edit your post" : "Share an idea or update"}
+        </DialogTitle>
+
+        {/* 1. TOP AUTHOR & CONTROLS */}
+        <div className="flex shrink-0 items-start justify-between pb-3.5 border-b border-[#F1F5F9]">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* 44px Circular Avatar */}
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-sm font-bold text-white shadow-sm ring-2 ring-[#E2E8F0]">
               {initials}
-            </span>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-lg font-semibold text-[#14213D]">{author}</p>
-                {role && (
-                  <span
-                    className={cn(
-                      "whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-semibold",
-                      role === "Founder"
-                        ? "bg-[#FEF3D8] text-[#8A5A00]"
-                        : "bg-[#EEF0FA] text-[#3F4FA0]",
-                    )}
-                  >
-                    {role}
-                  </span>
-                )}
+            </div>
+
+            {/* Author Name and Sub-row Dropdown */}
+            <div className="flex flex-col gap-1.5 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[15px] sm:text-[16px] font-bold text-[#14213D] tracking-tight truncate">
+                  {author}
+                </span>
+
+                {/* Role Chip */}
+                <span className={cn(
+                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                  role === "Founder" 
+                    ? "bg-[#FEF3C7] text-[#92400E]" 
+                    : "bg-[#EEF2FF] text-[#3730A3]"
+                )}>
+                  {role}
+                </span>
               </div>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Choose who can see this post"
-                    className="mt-1.5 inline-flex h-8 items-center gap-2 rounded-full bg-[#F3F4F6] px-3 text-sm font-medium text-[#475569] hover:bg-[#E5E7EB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544]"
-                  >
-                    <AudienceIcon className="size-4" aria-hidden="true" />
-                    {activeAudience.label}
-                    <ChevronDown className="size-3.5" aria-hidden="true" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {AUDIENCES.map((item) => (
-                    <DropdownMenuItem key={item.id} onSelect={() => setAudience(item.id)}>
-                      <item.icon className="mr-2 size-4" aria-hidden="true" />
-                      {item.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Icon-only Audience Dropdown directly underneath Author Name */}
+              <div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      title={activeAudience.label}
+                      aria-label={activeAudience.label}
+                      className="flex items-center gap-1 rounded-full bg-[#F8F9FA] hover:bg-[#F1F5F9] px-2.5 py-1 text-[#475569] border border-[#E2E8F0] transition-colors focus:outline-none"
+                    >
+                      <AudienceIcon className="size-3.5 text-[#3F4FA0]" />
+                      <ChevronDown className="size-3 text-[#64748B]" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-52 bg-white shadow-lg border border-[#E2E8F0] p-1.5 z-50">
+                    <div className="px-2.5 py-1.5 text-[11px] font-bold text-[#64748B]">
+                      Who can view
+                    </div>
+                    {AUDIENCES.map((item) => (
+                      <DropdownMenuItem
+                        key={item.id}
+                        onSelect={() => setAudience(item.id)}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-xs font-medium cursor-pointer",
+                          audience === item.id ? "bg-[#EEF2FF] text-[#3F4FA0] font-bold" : "text-[#14213D] hover:bg-[#F8F9FA]"
+                        )}
+                      >
+                        <item.icon className="size-4 text-[#3F4FA0]" />
+                        <span>{item.label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
-          </DialogHeader>
+
+          {/* Close button */}
           <button
             type="button"
             aria-label="Close"
             onClick={() => onOpenChange(false)}
-            className="grid size-10 place-items-center rounded-full bg-[#F3F4F6] text-[#475569] hover:bg-[#E5E7EB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544]"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-base font-medium text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D] ml-2"
           >
-            <X className="size-5" />
+            ✕
           </button>
-        </DialogHeader>
+        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-          
+        {/* 2. TEXT INPUT AREA (SPACIOUS CONTAINER WITH NATURAL SPACING) */}
+        <div className="flex-1 min-h-0 overflow-y-auto py-3 pr-1 flex flex-col">
+          <textarea
+            ref={textareaRef}
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value.slice(0, MAX_LENGTH))}
+            placeholder="What idea, milestone, or allocation are you building? Share details..."
+            className="w-full shrink-0 min-h-[60px] resize-none bg-transparent text-[16px] sm:text-[17px] leading-[1.6] text-[#14213D] placeholder:text-[#94A3B8] focus:outline-none break-words [overflow-wrap:anywhere]"
+          />
 
-          <div className="relative min-h-[220px]">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-[17px] leading-7 text-[#14213D]"
-            >
-              {parts.map((part, index) =>
-                index % 2 === 1 ? (
-                  <span key={index} className="text-[#3F4FA0]">
-                    {part}
-                  </span>
-                ) : (
-                  <span key={index}>{part}</span>
-                ),
-              )}
-              {"\n"}
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={text}
-              onChange={(event) => setText(event.target.value.slice(0, MAX_LENGTH))}
-              placeholder={PLACEHOLDERS[preset ?? ""] ?? "Share an idea, allocation or update…"}
-              aria-label="Post text"
-              rows={3}
-              className="relative block min-h-[96px] w-full resize-none overflow-hidden whitespace-pre-wrap break-words bg-transparent text-[17px] leading-7 text-transparent caret-[#14213D] outline-none placeholder:text-[#94A3B8]"
-            />
-          </div>
-
+          {/* Attached Image Preview - Full uncropped view */}
           {image && (
-            <div className="relative mt-4 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6]">
+            <div className="relative mt-2 shrink-0 overflow-hidden rounded-xl border border-[#E2E8F0] bg-[#F8FAFC]">
               <img
                 src={image.dataUrl}
-                alt={`Attached image ${image.name}`}
-                className="max-h-[340px] w-full object-cover"
+                alt={image.name}
+                className="max-h-[420px] w-full object-contain rounded-xl"
               />
-              <div className="absolute bottom-3 left-3 right-3 flex max-w-[calc(100%-1.5rem)] items-center gap-2 rounded-lg bg-[#14213D]/90 px-3 py-2 text-white sm:right-auto">
-                <Camera className="size-4 shrink-0 text-[#F5B544]" aria-hidden="true" />
-                <span className="min-w-0 truncate font-mono text-xs">
+              <div className="absolute top-2.5 right-2.5 flex items-center gap-2 rounded-lg bg-[#14213D]/90 px-2.5 py-1 text-xs text-white shadow backdrop-blur-sm">
+                <Camera className="size-3.5 text-[#F5B544]" />
+                <span className="max-w-[160px] truncate font-mono text-[11px]">
                   {image.name} · {formatSize(image.size)}
                 </span>
                 <button
                   type="button"
-                  aria-label="Remove image"
                   onClick={() => setImage(null)}
-                  className="shrink-0 rounded-full p-0.5 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544]"
+                  className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
+                  aria-label="Remove image"
                 >
-                  <X className="size-4" />
+                  <X className="size-3.5" />
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        <div className="relative flex shrink-0 items-center gap-1.5 border-t border-[#E5E7EB] px-4 py-4 sm:gap-2 sm:px-6">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(event) => {
-              void handleFile(event.target.files?.[0]);
-              event.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-[#F3F4F6] px-3 text-sm font-semibold text-[#475569] hover:bg-[#E5E7EB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544] sm:px-4"
-          >
-            <Camera className="size-4" aria-hidden="true" />
-            <span className="hidden min-[420px]:inline">Add Photo</span>
-            <span className="min-[420px]:hidden">Photo</span>
-          </button>
+        {/* 3. BOTTOM TOOLBAR & ACTION BAR */}
+        <div className="shrink-0 mt-auto flex items-center justify-between border-t border-[#F1F5F9] pt-3.5">
+          {/* LEFT SIDE: ATTACHMENT UTILITY ICONS */}
+          <div className="flex items-center gap-1">
+            {/* Emoji */}
+            <div ref={emojiRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setEmojiOpen((v) => !v)}
+                title="Add emoji"
+                className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
+              >
+                <Smile className="size-5" />
+              </button>
+              {emojiOpen && (
+                <div className="absolute bottom-11 left-0 z-50 grid w-[232px] grid-cols-8 gap-1 rounded-xl border border-[#E2E8F0] bg-white p-2 shadow-xl">
+                  {EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        insertAtCursor(emoji);
+                        setEmojiOpen(false);
+                      }}
+                      className="grid size-7 place-items-center rounded-md text-base hover:bg-[#F1F5F9]"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          <button
-            type="button"
-            aria-label="Add a hashtag"
-            onClick={() => insertAtCursor("#")}
-            className="grid size-10 shrink-0 place-items-center rounded-full text-[#64748B] hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544]"
-          >
-            <Hash className="size-5" />
-          </button>
-
-          <div ref={emojiRef} className="relative">
+            {/* Photo / Media Picker */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                void handleFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
             <button
               type="button"
-              aria-label="Add an emoji"
-              aria-expanded={emojiOpen}
-              onClick={() => setEmojiOpen((current) => !current)}
-              className="grid size-10 shrink-0 place-items-center rounded-full text-[#64748B] hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544]"
+              onClick={() => fileInputRef.current?.click()}
+              title="Attach media"
+              className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
             >
-              <Smile className="size-5" />
+              <ImageIcon className="size-5" />
             </button>
-            {emojiOpen && (
-              <div className="absolute bottom-12 left-0 z-20 grid w-[232px] grid-cols-8 gap-1 rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-lg">
-                {EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => {
-                      insertAtCursor(emoji);
-                      setEmojiOpen(false);
-                    }}
-                    className="grid size-7 place-items-center rounded-md text-lg hover:bg-[#F3F4F6]"
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
+
+            {/* Milestone / Celebrate Deal */}
+            <button
+              type="button"
+              onClick={() => {
+                setText("🚀 We just reached a major funding milestone! Proud to announce $1.2M allocated. #Milestone #Funding");
+                toast("Inserted milestone template");
+              }}
+              title="Celebrate a funding milestone"
+              className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
+            >
+              <Sparkles className="size-5" />
+            </button>
+
+            {/* Document / Deck */}
+            <button
+              type="button"
+              onClick={() => {
+                insertAtCursor("#");
+              }}
+              title="Add hashtag"
+              className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
+            >
+              <Hash className="size-5" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            aria-label="Attach a document"
-            onClick={() => toast("Attachments are coming soon")}
-            className="grid size-10 shrink-0 place-items-center rounded-full text-[#64748B] hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B544]"
-          >
-            <Paperclip className="size-5" />
-          </button>
+          {/* RIGHT SIDE: CONTROLS & POST BUTTON */}
+          <div className="flex items-center gap-3">
+            {/* Schedule Clock */}
+            <button
+              type="button"
+              onClick={() => toast("Post scheduling is queued for your network timeline (demo)")}
+              title="Schedule for later"
+              className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
+            >
+              <Clock className="size-5" />
+            </button>
 
-          <span
-            className={cn(
-              "ml-auto shrink-0 font-mono text-xs sm:text-sm",
-              text.length >= MAX_LENGTH ? "text-[#D9442F]" : "text-[#94A3B8]",
-            )}
-            aria-live="polite"
-          >
-            {text.length}/{MAX_LENGTH}
-          </span>
+            {/* Counter */}
+            <span className="text-[12px] font-medium text-[#94A3B8]">
+              {text.length} / {MAX_LENGTH}
+            </span>
 
-          <button
-            type="button"
-            disabled={!canPost}
-            onClick={post}
-            className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full bg-[#F5B544] px-5 text-base font-bold text-[#14213D] hover:bg-[#E9A72F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#14213D]/40 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6"
-          >
-            Post
-            <Send className="size-4" aria-hidden="true" />
-          </button>
+            {/* Primary Post / Save Button */}
+            <button
+              type="button"
+              disabled={!canPost}
+              onClick={handlePublish}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full px-6 py-2 text-[14px] font-semibold transition-all shadow-sm",
+                canPost
+                  ? "bg-[#F5B544] text-[#14213D] hover:bg-[#E9A72F] cursor-pointer shadow-md"
+                  : "bg-[#E2E8F0] text-[#94A3B8] cursor-not-allowed opacity-80"
+              )}
+            >
+              {isPosting ? (
+                <>
+                  <span className="size-3.5 animate-spin rounded-full border-2 border-[#14213D] border-t-transparent" />
+                  <span>{initialPost ? "Saving..." : "Posting..."}</span>
+                </>
+              ) : (
+                <span>{initialPost ? "Save changes" : "Post"}</span>
+              )}
+            </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -398,39 +449,48 @@ export function ComposerDialog({
 
 export function ComposerCard({
   onOpen,
+  initials,
 }: {
   onOpen: (preset?: string) => void;
+  initials?: string;
 }) {
+  const profile = useJoinStore((state) => state.profile);
+  const firstName = profile?.firstName || "Tariq";
+  const lastName = profile?.lastName || "Mansoor";
+  const userInitials =
+    initials ||
+    `${firstName[0] ?? "T"}${lastName[0] ?? "M"}`.toUpperCase();
+
   return (
     <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-[0_3px_14px_rgba(20,33,61,0.06)] sm:p-5">
       <div className="flex items-center gap-3">
         <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-[#14213D] text-xs font-bold text-white">
-          TM
+          {userInitials}
           <i className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-[#5BA4E6]" />
         </span>
         <button
           onClick={() => onOpen()}
-          className="h-10 min-w-0 flex-1 truncate rounded-full border border-[#E5E7EB] bg-[#F8FAFC] px-4 text-left text-xs text-[#64748B]"
+          className="h-10 min-w-0 flex-1 truncate rounded-full border border-[#E5E7EB] bg-[#F8FAFC] px-4 text-left text-xs text-[#64748B] hover:border-[#CBD5E1] transition-colors"
         >
           Share an idea, allocation or investment mandate…
         </button>
       </div>
       <div className="mt-3 grid grid-cols-3 border-t border-[#F1F3F6] pt-3">
         {[
-          [Mic, "Pitch", "bg-[#FEF3D8] text-[#8A5A00]"],
-          [FileText, "Media & Deck", "bg-[#EEF0FA] text-[#3F4FA0]"],
-          [PenLine, "Write memo", "bg-[#F3EEFA] text-[#7C5CBF]"],
+          [Sparkles, "Pitch", "bg-[#FEF3D8] text-[#8A5A00]"],
+          [ImageIcon, "Media & Deck", "bg-[#EEF0FA] text-[#3F4FA0]"],
+          [FileText, "Write memo", "bg-[#F3EEFA] text-[#7C5CBF]"],
         ].map(([Icon, label, color]) => {
-          const ItemIcon = Icon as typeof Mic;
+          const ItemIcon = Icon;
           const title = label as string;
           return (
             <button
               key={title}
               onClick={() => onOpen(title === "Write memo" ? "Memo" : title)}
-              className="flex min-h-11 items-center justify-center gap-2 text-[11px] font-semibold text-[#475569] sm:text-xs"
+              className="flex min-h-11 items-center justify-center gap-2 text-[11px] font-semibold text-[#475569] sm:text-xs hover:bg-[#F8FAFC] rounded-lg transition-colors"
             >
               <span
-                className={`grid size-7 place-items-center rounded-full ${color as string}`}
+                className={`grid size-7 place-items-center rounded-full ${color}`}
               >
                 <ItemIcon className="size-3.5" />
               </span>

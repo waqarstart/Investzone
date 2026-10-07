@@ -61,6 +61,7 @@ interface ComposerDialogProps {
   preset?: string;
   role?: "Founder" | "Investor";
   initialPost?: Post | null;
+  quotedPost?: Post | null;
 }
 
 function formatSize(bytes: number): string {
@@ -128,6 +129,7 @@ export function ComposerDialog({
   preset,
   role = "Founder",
   initialPost,
+  quotedPost,
 }: ComposerDialogProps) {
   const [text, setText] = useState("");
   const [audience, setAudience] = useState<AudienceId>("public");
@@ -263,7 +265,7 @@ export function ComposerDialog({
     }
   };
 
-  const canPost = (text.trim().length > 0 || images.length > 0) && !isPosting;
+  const canPost = (text.trim().length > 0 || images.length > 0 || Boolean(quotedPost)) && !isPosting;
 
   function handlePublish() {
     if (!canPost) return;
@@ -289,6 +291,7 @@ export function ComposerDialog({
         comments: initialPost?.comments || 0,
         engagementScore: initialPost?.engagementScore || 100,
         createdAt: initialPost?.createdAt || Date.now(),
+        quotedPost: quotedPost || undefined,
       });
 
       setIsPosting(false);
@@ -491,6 +494,31 @@ export function ComposerDialog({
                       </button>
                     )}
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Quoted Post Card Preview in Composer */}
+          {quotedPost && (
+            <div className="mt-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-left">
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-[10px] font-bold text-white">
+                  {quotedPost.initials}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-[#14213D] truncate">{quotedPost.name}</p>
+                  <p className="text-[10px] text-[#64748B] truncate">{quotedPost.headline}</p>
+                </div>
+              </div>
+              <p className="text-xs text-[#334155] line-clamp-3 break-words whitespace-pre-wrap">{quotedPost.body}</p>
+              {(quotedPost.images && quotedPost.images.length > 0 ? quotedPost.images : quotedPost.imageUrl ? [quotedPost.imageUrl] : []).length > 0 && (
+                <div className="mt-2.5 max-h-36 overflow-hidden rounded-lg border border-[#E2E8F0] bg-black">
+                  <img
+                    src={(quotedPost.images && quotedPost.images[0]) || quotedPost.imageUrl}
+                    alt="Quoted media preview"
+                    className="max-h-36 w-full object-contain"
+                  />
                 </div>
               )}
             </div>

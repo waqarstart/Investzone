@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Check,
   ChevronLeft,
@@ -28,22 +28,9 @@ import {
 import { useJoinStore } from '@/features/join/useJoinStore'
 import { useFeedStore } from '../useFeedStore'
 import { cn } from '@/lib/utils'
-import type { Post } from '../types'
+import type { CommentItem, Post } from '../types'
 import { ShareDialog } from './ShareDialog'
 import { ComposerDialog } from './ComposerDialog'
-
-interface CommentItem {
-  id: string
-  name: string
-  role: 'Founder' | 'Investor'
-  headline: string
-  time: string
-  initials: string
-  content: string
-  likes: number
-  isReply?: boolean
-  replyTo?: string
-}
 
 const SEED_COMMENT_TEMPLATES = [
   { name: 'Salman Kazi', role: 'Investor' as const, headline: 'Partner, Indus Seed Fund', initials: 'SK', content: "Impressive progress on the cold-chain telemetry! What is your current target ticket size for this tranche? We'd love to review the data room.", likes: 3 },
@@ -119,14 +106,33 @@ export function PostCard({
   const [editOpen, setEditOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [activeSlide, setActiveSlide] = useState(0)
-  const [comments, setComments] = useState<CommentItem[]>(() => generateInitialComments(post))
+  const storedComments = useFeedStore((state) => state.commentsMap[post.id])
+  const addCommentToStore = useFeedStore((state) => state.addComment)
+  const deleteCommentFromStore = useFeedStore((state) => state.deleteComment)
+  const setPostComments = useFeedStore((state) => state.setPostComments)
+
+  const comments = useMemo(() => {
+    if (storedComments && storedComments.length > 0) {
+      return storedComments
+    }
+    return generateInitialComments(post)
+  }, [storedComments, post])
+
   const [visibleCommentCount, setVisibleCommentCount] = useState(3)
   const [commentText, setCommentText] = useState('')
   const [requested, setRequested] = useState(false)
   const [requesting, setRequesting] = useState(false)
   const [connectedUsers, setConnectedUsers] = useState<Record<string, boolean>>({})
 
-  const incrementCommentCount = useFeedStore((state) => state.incrementCommentCount)
+  const [reposted, setReposted] = useState(false)
+  const [repostsCount, setRepostsCount] = useState(
+    post.id === 'amina' ? 8 : post.id === 'marcus' ? 12 : 3
+  )
+  const [quoteOpen, setQuoteOpen] = useState(false)
+
+  const addPost = useFeedStore((state) => state.addPost)
+  const deletePost = useFeedStore((state) => state.deletePost)
+  const allFeedPosts = useFeedStore((state) => state.posts)
   const postImages = post.images && post.images.length > 0 ? post.images : post.imageUrl ? [post.imageUrl] : []
   const count = post.interested
 
@@ -150,26 +156,42 @@ export function PostCard({
     const newComment: CommentItem = {
       id: `c-${Date.now()}`,
       name: authorName,
-      role: 'Founder',
-      headline: 'Founder & Systems Architect',
+      role: profile?.role === 'investor' ? 'Investor' : 'Founder',
+      headline: profile?.role === 'investor' ? 'Managing Partner · Syndicate' : 'Founder & Systems Architect',
       time: 'Just now',
       initials: authorInitials,
       content: commentText.trim(),
       likes: 0,
     }
-    setComments((prev) => [newComment, ...prev])
+
+    if (!storedComments || storedComments.length === 0) {
+      const initial = generateInitialComments(post)
+      setPostComments(post.id, [newComment, ...initial])
+    } else {
+      addCommentToStore(post.id, newComment)
+    }
+
     setVisibleCommentCount((prev) => prev + 1)
-    incrementCommentCount(post.id)
     setCommentText('')
     toast.success('Comment posted')
   }
 
   function handleCommentAction(commentId: string, action: 'hide' | 'delete' | 'report') {
     if (action === 'delete') {
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      if (!storedComments || storedComments.length === 0) {
+        const initial = generateInitialComments(post).filter((c) => c.id !== commentId)
+        setPostComments(post.id, initial)
+      } else {
+        deleteCommentFromStore(post.id, commentId)
+      }
       toast.success('Comment deleted')
     } else if (action === 'hide') {
-      setComments((prev) => prev.filter((c) => c.id !== commentId))
+      if (!storedComments || storedComments.length === 0) {
+        const initial = generateInitialComments(post).filter((c) => c.id !== commentId)
+        setPostComments(post.id, initial)
+      } else {
+        deleteCommentFromStore(post.id, commentId)
+      }
       toast('Comment hidden from public view')
     } else {
       toast.info('Comment reported to Bridgeway moderation')
@@ -180,14 +202,173 @@ export function PostCard({
     if (onDelete) {
       onDelete(post.id)
     } else {
+      deletePost(post.id)
       onHide(post.id)
     }
-    toast.success('Post deleted successfully')
+    toast.success(post.repostedBy ? 'Repost deleted successfully' : 'Post deleted successfully')
   }
+
+  function handleUndoRepost() {
+    setReposted(false)
+    setRepostsCount((prev) => Math.max(0, prev - 1))
+    const authorName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : 'Syeda Zahra Ijaz'
+    const matchedRepost = allFeedPosts.find(
+      (p) => p.repostedBy === authorName && p.body === post.body && p.name === post.name
+    )
+    if (matchedRepost) {
+      deletePost(matchedRepost.id)
+    }
+    toast.info('Repost removed from your feed')
+  }
+
+  function handleRepostInstantly() {
+    if (reposted) {
+      handleUndoRepost()
+      return
+    }
+    setReposted(true)
+    setRepostsCount((prev) => prev + 1)
+
+    const authorName = profile ? `${profile.firstName} ${profile.lastName}`.trim() : 'Syeda Zahra Ijaz'
+
+    const repostedPost: Post = {
+      id: `repost-${Date.now()}`,
+      name: post.name,
+      initials: post.initials,
+      kind: post.kind,
+      headline: post.headline,
+      time: 'Just now',
+      body: post.body,
+      tags: post.tags || [],
+      images: post.images && post.images.length > 0 ? [...post.images] : post.imageUrl ? [post.imageUrl] : [],
+      imageUrl: post.imageUrl,
+      imageName: post.imageName,
+      banner: post.banner,
+      extra: post.extra,
+      interested: 0,
+      comments: 0,
+      engagementScore: 99,
+      createdAt: Date.now(),
+      repostedBy: authorName,
+    }
+    addPost(repostedPost)
+    toast.success('Instantly reposted to your network!')
+  }
+
+  function handleRepostWithThoughts() {
+    setQuoteOpen(true)
+  }
+
+  const reposterInitials = post.repostedBy
+    ? post.repostedBy
+        .split(' ')
+        .filter(Boolean)
+        .map((w) => w[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase()
+    : 'SZ'
+
+  const isMyRepost = Boolean(
+    post.repostedBy &&
+      ((currentFullName !== '' && post.repostedBy.toLowerCase() === currentFullName) ||
+        post.repostedBy.toLowerCase().includes('zahra'))
+  )
+  const canDelete = isSelf || isMyRepost
+
+  const renderPostOptions = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          aria-label="Post options"
+          className="grid size-8 shrink-0 place-items-center rounded-full text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#14213D] transition-colors focus:outline-none"
+        >
+          <MoreHorizontal className="size-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48 bg-white border border-[#E2E8F0] shadow-lg z-50">
+        {canDelete ? (
+          <>
+            {!post.repostedBy && (
+              <DropdownMenuItem
+                onSelect={() => setEditOpen(true)}
+                className="flex items-center gap-2 text-xs py-2 text-[#14213D] cursor-pointer"
+              >
+                <Edit3 className="size-3.5 text-[#3F4FA0]" />
+                <span>Edit post</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onSelect={handleDeletePost}
+              className="flex items-center gap-2 text-xs py-2 text-[#EF4444] cursor-pointer"
+            >
+              <Trash2 className="size-3.5 text-[#EF4444]" />
+              <span>{post.repostedBy ? 'Delete repost' : 'Delete post'}</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => toast.success(post.repostedBy ? 'Repost pinned to your profile' : 'Post pinned to your profile')}
+              className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
+            >
+              <Pin className="size-3.5 text-[#64748B]" />
+              <span>Pin to top</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => {
+                navigator.clipboard?.writeText?.(window.location.href)
+                toast.success('Link copied to clipboard')
+              }}
+              className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
+            >
+              <Copy className="size-3.5 text-[#64748B]" />
+              <span>Copy link</span>
+            </DropdownMenuItem>
+          </>
+        ) : (
+          <>
+            <DropdownMenuItem
+              onSelect={() => toast.success('Post saved to bookmarks')}
+              className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
+            >
+              Save post
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => onHide(post.id)}
+              className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
+            >
+              Hide post
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => toast.info('Report received by Bridgeway')}
+              className="flex items-center gap-2 text-xs py-2 text-[#EF4444] cursor-pointer"
+            >
+              Report post
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 
   return (
     <>
       <article className="min-w-0 overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_3px_14px_rgba(20,33,61,0.06)]">
+        {/* Repost Header Tag - Exact LinkedIn Style */}
+        {post.repostedBy && (
+          <div className="flex items-center justify-between border-b border-[#F1F5F9] bg-white px-4 pt-3 pb-2.5 text-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-[9px] font-bold text-white ring-1 ring-[#10B981]/50 overflow-hidden shadow-xs">
+                {reposterInitials}
+              </div>
+              <span className="truncate text-xs text-[#64748B]">
+                <strong className="font-bold text-[#14213D]">{post.repostedBy}</strong> reposted this
+              </span>
+            </div>
+            {renderPostOptions()}
+          </div>
+        )}
+
         {/* Post Author Header */}
         <div className="flex min-w-0 items-start gap-3 p-4 sm:p-5">
           <span
@@ -213,7 +394,7 @@ export function PostCard({
             </div>
             <p className="line-clamp-2 text-xs text-[#64748B]">{post.headline}</p>
             <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[#94A3B8]">
-              {post.time} · <Globe2 className="size-3" />
+              {post.time} {post.repostedBy && <span>· Reposted</span>} · <Globe2 className="size-3" />
             </p>
           </div>
 
@@ -243,74 +424,8 @@ export function PostCard({
             </button>
           )}
 
-          {/* 3-Dot Post Options Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button aria-label="Post options" className="grid size-8 shrink-0 place-items-center rounded-full text-[#94A3B8] hover:bg-[#F8F9FA] hover:text-[#14213D]">
-                <MoreHorizontal className="size-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-white border border-[#E2E8F0] shadow-lg">
-              {isSelf ? (
-                <>
-                  <DropdownMenuItem
-                    onSelect={() => setEditOpen(true)}
-                    className="flex items-center gap-2 text-xs py-2 text-[#14213D] cursor-pointer"
-                  >
-                    <Edit3 className="size-3.5 text-[#3F4FA0]" />
-                    <span>Edit post</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={handleDeletePost}
-                    className="flex items-center gap-2 text-xs py-2 text-[#EF4444] cursor-pointer"
-                  >
-                    <Trash2 className="size-3.5 text-[#EF4444]" />
-                    <span>Delete post</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => toast.success('Post pinned to your profile')}
-                    className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
-                  >
-                    <Pin className="size-3.5 text-[#64748B]" />
-                    <span>Pin to top</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      navigator.clipboard?.writeText?.(window.location.href)
-                      toast.success('Link copied to clipboard')
-                    }}
-                    className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
-                  >
-                    <Copy className="size-3.5 text-[#64748B]" />
-                    <span>Copy link</span>
-                  </DropdownMenuItem>
-                </>
-              ) : (
-                <>
-                  <DropdownMenuItem
-                    onSelect={() => toast.success('Post saved to bookmarks')}
-                    className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
-                  >
-                    Save post
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => onHide(post.id)}
-                    className="flex items-center gap-2 text-xs py-2 text-[#334155] cursor-pointer"
-                  >
-                    Hide post
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => toast.info('Report received by Bridgeway')}
-                    className="flex items-center gap-2 text-xs py-2 text-[#EF4444] cursor-pointer"
-                  >
-                    Report post
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* 3-Dot Post Options Dropdown (only when not reposted, as it is already at the top row) */}
+          {!post.repostedBy && renderPostOptions()}
         </div>
 
         {/* Post Content Body */}
@@ -341,31 +456,34 @@ export function PostCard({
             </>
           ) : (
             <div>
-              {!isExpanded && (postImages.length > 0 ? post.body.length > 70 : post.body.length > 200) ? (
-                <p className="break-words [overflow-wrap:anywhere]">
-                  {post.body.slice(0, postImages.length > 0 ? 68 : 180).trim()}…{' '}
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(true)}
-                    className="font-semibold text-[#64748B] hover:text-[#14213D] hover:underline"
-                  >
-                    more
-                  </button>
-                </p>
-              ) : (
-                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                  {post.body}
-                  {isExpanded && (postImages.length > 0 ? post.body.length > 70 : post.body.length > 200) && (
+              {(() => {
+                const displayBody = post.body.replace(/^(🔄\s*Reposted from[^\n]+:\s*\n*|—\s*Quoting[^\n]+:\s*\n*)/i, '').trim()
+                return !isExpanded && (postImages.length > 0 ? displayBody.length > 70 : displayBody.length > 200) ? (
+                  <p className="break-words [overflow-wrap:anywhere]">
+                    {displayBody.slice(0, postImages.length > 0 ? 68 : 180).trim()}…{' '}
                     <button
                       type="button"
-                      onClick={() => setIsExpanded(false)}
-                      className="ml-2 font-semibold text-[#64748B] hover:text-[#14213D] hover:underline"
+                      onClick={() => setIsExpanded(true)}
+                      className="font-semibold text-[#64748B] hover:text-[#14213D] hover:underline"
                     >
-                      less
+                      more
                     </button>
-                  )}
-                </p>
-              )}
+                  </p>
+                ) : (
+                  <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                    {displayBody}
+                    {isExpanded && (postImages.length > 0 ? displayBody.length > 70 : displayBody.length > 200) && (
+                      <button
+                        type="button"
+                        onClick={() => setIsExpanded(false)}
+                        className="ml-2 font-semibold text-[#64748B] hover:text-[#14213D] hover:underline"
+                      >
+                        less
+                      </button>
+                    )}
+                  </p>
+                )
+              })()}
             </div>
           )}
 
@@ -481,6 +599,50 @@ export function PostCard({
               </div>
             </div>
           )}
+
+          {/* Quoted Post Embedded Card */}
+          {post.quotedPost && (
+            <div className="mt-3 overflow-hidden rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-left">
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-[11px] font-bold text-white shadow-sm">
+                  {post.quotedPost.initials}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs font-bold text-[#14213D] truncate">{post.quotedPost.name}</p>
+                    <span className="rounded-full px-1.5 py-0.2 bg-[#FEF3D8] text-[9px] font-bold text-[#92400E] uppercase">
+                      {post.quotedPost.kind}
+                    </span>
+                    <span className="text-[10px] text-[#94A3B8]">· {post.quotedPost.time}</span>
+                  </div>
+                  <p className="text-[11px] text-[#64748B] truncate">{post.quotedPost.headline}</p>
+                </div>
+              </div>
+              <p className="text-xs leading-relaxed text-[#334155] whitespace-pre-wrap break-words">{post.quotedPost.body}</p>
+              
+              {/* Quoted Post Tags */}
+              {post.quotedPost.tags && post.quotedPost.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {post.quotedPost.tags.map((tag) => (
+                    <span key={tag} className="text-[10px] font-medium text-[#3F4FA0]">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Quoted Post Images */}
+              {(post.quotedPost.images && post.quotedPost.images.length > 0 ? post.quotedPost.images : post.quotedPost.imageUrl ? [post.quotedPost.imageUrl] : []).length > 0 && (
+                <div className="mt-2.5 max-h-56 overflow-hidden rounded-lg border border-[#E2E8F0] bg-black">
+                  <img
+                    src={(post.quotedPost.images && post.quotedPost.images[0]) || post.quotedPost.imageUrl}
+                    alt="Quoted post media attachment"
+                    className="max-h-56 w-full object-contain"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Social Counts Bar */}
@@ -489,31 +651,34 @@ export function PostCard({
             <span className="grid size-5 place-items-center rounded-full bg-[#FEF3D8] text-[#d6a528]">
               <ThumbsUp className="size-3 fill-current text-[#d6a528]" />
             </span>
-            {count + (liked ? 1 : 0)} Likes
+            {count + (liked ? 1 : 0)}
           </span>
-          <span className="ml-auto">
-            {comments.length} comments <span className="px-1.5">·</span>
-            <span className="font-semibold text-[#3F4FA0]">
-              {post.kind === 'founder' ? '9 allocations requested' : '14 memos pitched'}
-            </span>
+          <span className="ml-auto flex items-center gap-1 text-[#64748B]">
+            <span>{comments.length} comments</span>
+            <span className="px-0.5">·</span>
+            <span>{repostsCount} reposts</span>
           </span>
         </div>
 
         {/* Action Buttons Row */}
         <div className="grid grid-cols-4 border-t border-[#F1F3F6] px-1 py-1">
+          {/* Like */}
           <button
+            type="button"
             onClick={() => setLiked((v) => !v)}
-            className={`flex min-h-10 items-center justify-center gap-1.5 text-xs font-semibold ${
-              liked ? 'text-[#F5B544]' : 'text-[#64748B] hover:text-[#14213D]'
+            className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[#F8F9FA] cursor-pointer ${
+              liked ? 'text-[#3F4FA0]' : 'text-[#64748B] hover:text-[#14213D]'
             }`}
           >
-            <ThumbsUp className={`size-4 ${liked ? 'fill-[#F5B544]' : ''}`} />
+            <ThumbsUp className={`size-4 ${liked ? 'fill-[#3F4FA0]' : ''}`} />
             <span>Like</span>
           </button>
 
+          {/* Comment */}
           <button
+            type="button"
             onClick={() => setCommentsOpen((v) => !v)}
-            className={`flex min-h-10 items-center justify-center gap-1.5 text-xs font-semibold ${
+            className={`flex min-h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[#F8F9FA] cursor-pointer ${
               commentsOpen ? 'text-[#3F4FA0]' : 'text-[#64748B] hover:text-[#14213D]'
             }`}
           >
@@ -521,20 +686,56 @@ export function PostCard({
             <span>Comment</span>
           </button>
 
-          <button
-            onClick={() => setShareOpen(true)}
-            className="flex min-h-10 items-center justify-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#3F4FA0]"
-          >
-            <Repeat2 className="size-4" />
-            <span>Repost</span>
-          </button>
+          {/* Repost Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'flex min-h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-[#F8F9FA] cursor-pointer',
+                  reposted ? 'text-[#3F4FA0]' : 'text-[#64748B] hover:text-[#14213D]'
+                )}
+              >
+                <Repeat2 className="size-4" />
+                <span>Repost</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-56 rounded-xl border border-[#E2E8F0] bg-white p-1.5 shadow-lg z-50">
+              {reposted ? (
+                <DropdownMenuItem
+                  onSelect={handleUndoRepost}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-semibold text-[#EF4444] hover:bg-red-50 cursor-pointer"
+                >
+                  <Trash2 className="size-4 text-[#EF4444]" />
+                  <span>Undo repost</span>
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onSelect={handleRepostInstantly}
+                  className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-semibold text-[#14213D] hover:bg-[#F8F9FA] cursor-pointer"
+                >
+                  <Repeat2 className="size-4 text-[#64748B]" />
+                  <span>Repost instantly</span>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onSelect={handleRepostWithThoughts}
+                className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-xs font-semibold text-[#14213D] hover:bg-[#F8F9FA] cursor-pointer"
+              >
+                <Edit3 className="size-4 text-[#64748B]" />
+                <span>Repost with thoughts</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
+          {/* Send */}
           <button
+            type="button"
             onClick={() => setShareOpen(true)}
-            className="flex min-h-10 items-center justify-center gap-1.5 text-xs font-semibold text-[#64748B] hover:text-[#3F4FA0]"
+            className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-[#64748B] hover:text-[#14213D] transition-colors hover:bg-[#F8F9FA] cursor-pointer"
           >
             <Send className="size-4" />
-            <span>Share</span>
+            <span>Send</span>
           </button>
         </div>
 
@@ -729,7 +930,31 @@ export function PostCard({
         />
       )}
 
-      {/* Share / Repost Modal */}
+      {/* Quote Post Modal */}
+      {quoteOpen && (
+        <ComposerDialog
+          open={quoteOpen}
+          onOpenChange={setQuoteOpen}
+          author={profile ? `${profile.firstName} ${profile.lastName}`.trim() : 'Syeda Zahra Ijaz'}
+          initials={
+            profile
+              ? `${profile.firstName[0] || 'Z'}${profile.lastName[0] || 'I'}`.toUpperCase()
+              : 'SZ'
+          }
+          role={profile?.role === 'investor' ? 'Investor' : 'Founder'}
+          preset="Quote"
+          quotedPost={post}
+          onPost={(newPost) => {
+            addPost(newPost)
+            setQuoteOpen(false)
+            setReposted(true)
+            setRepostsCount((prev) => prev + 1)
+            toast.success('Quote post shared to your network!')
+          }}
+        />
+      )}
+
+      {/* Share / Direct Memo Modal */}
       <ShareDialog open={shareOpen} onOpenChange={setShareOpen} post={post} />
     </>
   )

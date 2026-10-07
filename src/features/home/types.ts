@@ -9,6 +9,19 @@ export interface Story {
   gradient: string
 }
 
+export interface CommentItem {
+  id: string
+  name: string
+  role: 'Founder' | 'Investor'
+  headline: string
+  time: string
+  initials: string
+  content: string
+  likes: number
+  isReply?: boolean
+  replyTo?: string
+}
+
 export interface Post {
   id: string
   name: string
@@ -27,4 +40,7 @@ export interface Post {
   images?: string[]
   imageName?: string
   banner?: 'deal' | 'celebration'
+  reposts?: number
+  repostedBy?: string
+  quotedPost?: Post
 }

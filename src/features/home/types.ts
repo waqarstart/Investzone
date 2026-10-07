@@ -24,6 +24,7 @@ export interface Post {
   engagementScore: number
   createdAt: number
   imageUrl?: string
+  images?: string[]
   imageName?: string
   banner?: 'deal' | 'celebration'
 }

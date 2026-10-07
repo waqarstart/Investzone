@@ -2,15 +2,19 @@ import { useEffect, useRef, useState } from "react";
 import {
   Camera,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   FileText,
   Globe,
   Hash,
   Image as ImageIcon,
+  Plus,
   Smile,
   Sparkles,
   Users,
   X,
+  ZoomIn,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -25,6 +29,7 @@ import { cn } from "@/lib/utils";
 import type { Post } from "../types";
 
 const MAX_LENGTH = 1000;
+const MAX_IMAGES = 10;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const HASHTAG = /#[\p{L}\p{N}_]+/gu;
 
@@ -73,6 +78,47 @@ function readAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function compressAndReadImage(file: File, maxWidth = 1080, quality = 0.75): Promise<string> {
+  if (file.type === "image/gif") {
+    return readAsDataUrl(file);
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let { width, height } = img;
+
+        if (width > maxWidth || height > maxWidth) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxWidth) / height);
+            height = maxWidth;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressed);
+        } else {
+          resolve(String(e.target?.result || ""));
+        }
+      };
+      img.onerror = () => resolve(String(e.target?.result || ""));
+      img.src = String(e.target?.result || "");
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+}
+
 export function ComposerDialog({
   open,
   onOpenChange,
@@ -85,30 +131,54 @@ export function ComposerDialog({
 }: ComposerDialogProps) {
   const [text, setText] = useState("");
   const [audience, setAudience] = useState<AudienceId>("public");
-  const [image, setImage] = useState<AttachedImage | null>(null);
+  const [images, setImages] = useState<AttachedImage[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (previewIndex === null) return undefined;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewIndex(null);
+      } else if (e.key === "ArrowLeft") {
+        setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+      } else if (e.key === "ArrowRight") {
+        setPreviewIndex((prev) => (prev !== null && prev < images.length - 1 ? prev + 1 : prev));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewIndex, images.length]);
+
+  useEffect(() => {
     if (open) {
       if (initialPost) {
         setText(initialPost.body);
-        setImage(
-          initialPost.imageUrl
-            ? {
-                name: initialPost.imageName || "Attached image",
-                size: 1024 * 500,
-                dataUrl: initialPost.imageUrl,
-              }
-            : null
-        );
+        const loadedImages: AttachedImage[] = [];
+        if (initialPost.images && initialPost.images.length > 0) {
+          initialPost.images.forEach((url, i) => {
+            loadedImages.push({
+              name: `Photo ${i + 1}`,
+              size: 1024 * 400,
+              dataUrl: url,
+            });
+          });
+        } else if (initialPost.imageUrl) {
+          loadedImages.push({
+            name: initialPost.imageName || "Attached photo",
+            size: 1024 * 400,
+            dataUrl: initialPost.imageUrl,
+          });
+        }
+        setImages(loadedImages);
       } else {
         setText("");
-        setImage(null);
+        setImages([]);
       }
       setAudience("public");
       setIsPosting(false);
@@ -150,26 +220,50 @@ export function ComposerDialog({
     });
   };
 
-  const handleFile = async (file: File | undefined) => {
-    if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
-      toast.error("Please choose a PNG, JPG or WebP image");
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const incoming = Array.from(files);
+
+    if (images.length + incoming.length > MAX_IMAGES) {
+      toast.info(`You can attach up to ${MAX_IMAGES} photos per post.`);
+    }
+
+    const availableSlots = Math.max(0, MAX_IMAGES - images.length);
+    if (availableSlots <= 0) {
+      toast.error(`Maximum limit of ${MAX_IMAGES} photos reached.`);
       return;
     }
-    if (file.size > MAX_IMAGE_BYTES) {
-      toast.error("Image must be smaller than 10 MB");
-      return;
-    }
+
+    const toProcess = incoming.slice(0, availableSlots);
+
+    const validFiles = toProcess.filter((file) => {
+      if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
+        toast.error(`${file.name}: Please choose a PNG, JPG or WebP image`);
+        return false;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        toast.error(`${file.name}: Image must be smaller than 10 MB`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
     try {
-      const dataUrl = await readAsDataUrl(file);
-      setImage({ name: file.name, size: file.size, dataUrl });
-      toast.success("Image attached");
+      const readPromises = validFiles.map(async (file) => {
+        const dataUrl = await compressAndReadImage(file);
+        return { name: file.name, size: file.size, dataUrl };
+      });
+      const newImages = await Promise.all(readPromises);
+      setImages((prev) => [...prev, ...newImages]);
+      toast.success(`${newImages.length} photo${newImages.length === 1 ? "" : "s"} attached`);
     } catch {
-      toast.error("Could not read image file");
+      toast.error("Could not read attached images");
     }
   };
 
-  const canPost = (text.trim().length > 0 || image !== null) && !isPosting;
+  const canPost = (text.trim().length > 0 || images.length > 0) && !isPosting;
 
   function handlePublish() {
     if (!canPost) return;
@@ -188,8 +282,9 @@ export function ComposerDialog({
         time: initialPost?.time || "Just now",
         body,
         tags,
-        imageUrl: image?.dataUrl,
-        imageName: image?.name,
+        images: images.map((img) => img.dataUrl),
+        imageUrl: images[0]?.dataUrl,
+        imageName: images.length > 1 ? `${images.length} photos` : images[0]?.name,
         interested: initialPost?.interested || 0,
         comments: initialPost?.comments || 0,
         engagementScore: initialPost?.engagementScore || 100,
@@ -297,28 +392,205 @@ export function ComposerDialog({
             className="w-full shrink-0 min-h-[60px] resize-none bg-transparent text-[16px] sm:text-[17px] leading-[1.6] text-[#14213D] placeholder:text-[#94A3B8] focus:outline-none break-words [overflow-wrap:anywhere]"
           />
 
-          {/* Attached Image Preview - Full uncropped view */}
-          {image && (
-            <div className="relative mt-2 shrink-0 overflow-hidden rounded-xl border border-[#E2E8F0] bg-[#F8FAFC]">
-              <img
-                src={image.dataUrl}
-                alt={image.name}
-                className="max-h-[420px] w-full object-contain rounded-xl"
-              />
-              <div className="absolute top-2.5 right-2.5 flex items-center gap-2 rounded-lg bg-[#14213D]/90 px-2.5 py-1 text-xs text-white shadow backdrop-blur-sm">
-                <Camera className="size-3.5 text-[#F5B544]" />
-                <span className="max-w-[160px] truncate font-mono text-[11px]">
-                  {image.name} · {formatSize(image.size)}
-                </span>
+          {/* Attached Images Preview */}
+          {images.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2">
+              {/* Single Image Preview */}
+              {images.length === 1 ? (
+                <div
+                  onClick={() => setPreviewIndex(0)}
+                  className="group relative overflow-hidden rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] cursor-pointer hover:border-[#3F4FA0]/50 transition-colors"
+                >
+                  <img
+                    src={images[0].dataUrl}
+                    alt={images[0].name}
+                    className="max-h-[380px] w-full object-contain rounded-xl transition-transform group-hover:scale-[1.01]"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl pointer-events-none">
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1.5 text-xs font-semibold text-white shadow backdrop-blur-sm">
+                      <ZoomIn className="size-4" />
+                      <span>Click to preview</span>
+                    </div>
+                  </div>
+                  <div
+                    className="absolute top-2.5 right-2.5 flex items-center gap-2 rounded-lg bg-[#14213D]/90 px-2.5 py-1 text-xs text-white shadow backdrop-blur-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Camera className="size-3.5 text-[#F5B544]" />
+                    <span className="max-w-[160px] truncate font-mono text-[11px]">
+                      {images[0].name} · {formatSize(images[0].size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setImages([])}
+                      className="rounded-full p-0.5 hover:bg-white/20 transition-colors cursor-pointer"
+                      aria-label="Remove image"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Multi-Image Gallery Strip (up to 10 photos) */
+                <div className="flex flex-col gap-2 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#14213D] flex items-center gap-1.5">
+                      <Camera className="size-4 text-[#3F4FA0]" />
+                      <span>Attached Photos ({images.length}/{MAX_IMAGES})</span>
+                    </span>
+                    {images.length < MAX_IMAGES && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-semibold text-[#3F4FA0] hover:underline cursor-pointer"
+                      >
+                        + Add more
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Horizontal Scrollable Thumbnails */}
+                  <div className="flex gap-2.5 overflow-x-auto pb-1 pt-1 [scrollbar-width:thin]">
+                    {images.map((img, idx) => (
+                      <div
+                        key={`${img.name}-${idx}`}
+                        onClick={() => setPreviewIndex(idx)}
+                        className="group relative size-24 shrink-0 overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm cursor-pointer transition-all hover:border-[#3F4FA0] hover:shadow-md hover:scale-[1.03]"
+                      >
+                        <img
+                          src={img.dataUrl}
+                          alt={img.name}
+                          className="h-full w-full object-cover rounded-xl"
+                        />
+                        {/* Hover Overlay with Zoom Icon */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
+                          <ZoomIn className="size-5 text-white drop-shadow-md" />
+                        </div>
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setImages((prev) => prev.filter((_, i) => i !== idx));
+                          }}
+                          className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-black/70 text-white hover:bg-red-600 transition-colors shadow z-10 cursor-pointer"
+                          aria-label={`Remove photo ${idx + 1}`}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {images.length < MAX_IMAGES && (
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex size-24 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#CBD5E1] bg-white text-[#64748B] hover:border-[#3F4FA0] hover:text-[#3F4FA0] transition-colors cursor-pointer"
+                      >
+                        <Plus className="size-5" />
+                        <span className="text-[10px] font-semibold mt-1">Add photo</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lightbox / Full Photo Preview Modal */}
+          {previewIndex !== null && images[previewIndex] && (
+            <div
+              className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-md animate-in fade-in duration-200 select-none"
+              onClick={() => setPreviewIndex(null)}
+            >
+              {/* Top Bar */}
+              <div
+                className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-6 py-4 bg-gradient-to-b from-black/80 to-transparent text-white"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Camera className="size-4 text-[#F5B544]" />
+                  <span className="text-sm font-semibold truncate max-w-[240px] sm:max-w-md">
+                    {images[previewIndex].name}
+                  </span>
+                  <span className="text-xs text-white/60">
+                    ({previewIndex + 1} of {images.length})
+                  </span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => setImage(null)}
-                  className="rounded-full p-0.5 hover:bg-white/20 transition-colors"
-                  aria-label="Remove image"
+                  onClick={() => setPreviewIndex(null)}
+                  className="flex size-9 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                  aria-label="Close preview"
                 >
-                  <X className="size-3.5" />
+                  <X className="size-5" />
                 </button>
               </div>
+
+              {/* Previous Button */}
+              {images.length > 1 && previewIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : prev));
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 z-20 flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-xl hover:bg-black/90 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                  aria-label="Previous photo"
+                >
+                  <ChevronLeft className="size-6" />
+                </button>
+              )}
+
+              {/* Next Button */}
+              {images.length > 1 && previewIndex < images.length - 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setPreviewIndex((prev) => (prev !== null && prev < images.length - 1 ? prev + 1 : prev));
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex size-11 items-center justify-center rounded-full bg-black/60 text-white shadow-xl hover:bg-black/90 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                  aria-label="Next photo"
+                >
+                  <ChevronRight className="size-6" />
+                </button>
+              )}
+
+              {/* Center Full Image */}
+              <div
+                className="relative max-h-[82vh] max-w-[90vw] flex items-center justify-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <img
+                  src={images[previewIndex].dataUrl}
+                  alt={images[previewIndex].name}
+                  className="max-h-[82vh] max-w-[90vw] object-contain rounded-xl shadow-2xl"
+                />
+              </div>
+
+              {/* Bottom Thumbnail Strip inside Lightbox */}
+              {images.length > 1 && (
+                <div
+                  className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 backdrop-blur-md overflow-x-auto max-w-[90vw]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setPreviewIndex(idx)}
+                      className={cn(
+                        "size-9 rounded-lg overflow-hidden border-2 transition-all shrink-0 cursor-pointer",
+                        idx === previewIndex
+                          ? "border-white scale-110 shadow-md"
+                          : "border-transparent opacity-50 hover:opacity-100"
+                      )}
+                    >
+                      <img src={img.dataUrl} alt={`Thumbnail ${idx + 1}`} className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -360,17 +632,18 @@ export function ComposerDialog({
             <input
               ref={fileInputRef}
               type="file"
+              multiple
               accept="image/png,image/jpeg,image/webp,image/gif"
               className="hidden"
               onChange={(e) => {
-                void handleFile(e.target.files?.[0]);
+                void handleFiles(e.target.files);
                 e.target.value = "";
               }}
             />
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              title="Attach media"
+              title="Attach media (up to 10 photos)"
               className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
             >
               <ImageIcon className="size-5" />

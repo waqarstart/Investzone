@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Copy,
   Edit3,
@@ -24,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useJoinStore } from '@/features/join/useJoinStore'
+import { useFeedStore } from '../useFeedStore'
+import { cn } from '@/lib/utils'
 import type { Post } from '../types'
 import { ShareDialog } from './ShareDialog'
 import { ComposerDialog } from './ComposerDialog'
@@ -41,40 +45,53 @@ interface CommentItem {
   replyTo?: string
 }
 
-const DEFAULT_COMMENTS: CommentItem[] = [
-  {
-    id: 'c1',
-    name: 'Salman Kazi',
-    role: 'Investor',
-    headline: 'Partner, Indus Seed Fund',
-    time: '15m ago',
-    initials: 'SK',
-    content: "Impressive progress on the cold-chain telemetry! What is your current target ticket size for this tranche? We'd love to review the data room.",
-    likes: 3,
-  },
-  {
-    id: 'c2',
-    name: 'Tariq Malik',
-    role: 'Founder',
-    headline: 'Author',
-    time: '8m ago',
-    initials: 'TM',
-    content: "@Salman Kazi Thanks Salman! We are opening ticket sizes between $25k–$50k. Sending you the data room access via Communications.",
-    likes: 1,
-    isReply: true,
-    replyTo: 'Salman Kazi',
-  },
-  {
-    id: 'c3',
-    name: 'Amina Zafar',
-    role: 'Investor',
-    headline: 'Indus Valley Ventures',
-    time: '32m ago',
-    initials: 'AZ',
-    content: 'Great hardware architecture. Are you deploying with standard cellular IoT (NB-IoT/LTE-M) for remote farms?',
-    likes: 2,
-  },
+const SEED_COMMENT_TEMPLATES = [
+  { name: 'Salman Kazi', role: 'Investor' as const, headline: 'Partner, Indus Seed Fund', initials: 'SK', content: "Impressive progress on the cold-chain telemetry! What is your current target ticket size for this tranche? We'd love to review the data room.", likes: 3 },
+  { name: 'Tariq Malik', role: 'Founder' as const, headline: 'Author', initials: 'TM', content: "@Salman Kazi Thanks Salman! We are opening ticket sizes between $25k–$50k. Sending you the data room access via Communications.", likes: 1, isReply: true, replyTo: 'Salman Kazi' },
+  { name: 'Amina Zafar', role: 'Investor' as const, headline: 'Indus Valley Ventures', initials: 'AZ', content: 'Great hardware architecture. Are you deploying with standard cellular IoT (NB-IoT/LTE-M) for remote farms?', likes: 2 },
+  { name: 'Bilal Chaudhry', role: 'Investor' as const, headline: 'Angel Syndicate Lead', initials: 'BC', content: 'Strong unit economics. What does the customer payback curve look like across tier-2 commercial pilots?', likes: 4 },
+  { name: 'Zoya Alvi', role: 'Founder' as const, headline: 'CTO @ NexusFin', initials: 'ZA', content: 'Exciting milestone! Bilateral settlement guarantees like this are sorely needed in cross-border commerce.', likes: 2 },
+  { name: 'Hamza Farooq', role: 'Investor' as const, headline: 'VP @ Apex Capital', initials: 'HF', content: 'Connecting with you now to review the termsheet covenants and audit memo.', likes: 5 },
+  { name: 'Sarah Jenkins', role: 'Investor' as const, headline: 'Global Growth Partner', initials: 'SJ', content: 'Congratulations on opening the round! We have allocated $100K from our syndication desk.', likes: 7 },
+  { name: 'Usman Ghani', role: 'Founder' as const, headline: 'Co-Founder @ AgriScale', initials: 'UG', content: 'Inspiring journey. Would love to collaborate on hardware telemetry integrations.', likes: 1 },
+  { name: 'Farhan Siddiqui', role: 'Investor' as const, headline: 'Principal, Falcon Fund', initials: 'FS', content: 'The regulatory moat here is substantial. Let us schedule a diligence call this week.', likes: 3 },
+  { name: 'Nida Rehman', role: 'Investor' as const, headline: 'Partner, Ventures Hub', initials: 'NR', content: 'Sent bilateral request for the pitch deck and audited financial projections.', likes: 2 },
+  { name: 'Kashif Mehmood', role: 'Founder' as const, headline: 'CEO @ MediBridge', initials: 'KM', content: 'Terrific execution. The pilot retention numbers speak for themselves!', likes: 4 },
+  { name: 'Ayesha Mirza', role: 'Investor' as const, headline: 'LP Syndicate Director', initials: 'AM', content: 'Reviewed your milestone deck. Very impressed with the gross margin trajectory.', likes: 6 },
+  { name: 'Rohail Dar', role: 'Founder' as const, headline: 'FinTech Architect', initials: 'RD', content: 'How are you handling the offline ledger synchronization in low-connectivity rural hubs?', likes: 2 },
+  { name: 'Mahnoor Khan', role: 'Investor' as const, headline: 'Venture Scout', initials: 'MK', content: 'Shared this syndicate opportunity with our regional angel group.', likes: 3 },
+  { name: 'Daniyal Ahmed', role: 'Founder' as const, headline: 'Growth Lead', initials: 'DA', content: 'Phenomenal progress! Looking forward to seeing the Series A roadmap unfold.', likes: 1 },
+  { name: 'Omer Farooq', role: 'Investor' as const, headline: 'Managing Director @ Crescent Ventures', initials: 'OF', content: 'Solid traction metrics. Is the lead investor taking board representation?', likes: 4 },
+  { name: 'Sana Rauf', role: 'Founder' as const, headline: 'COO @ SolarGrid', initials: 'SR', content: 'The scalability of your decentralized pilot is impressive. Best of luck with the round!', likes: 2 },
+  { name: 'Zeeshan Ali', role: 'Investor' as const, headline: 'Partner, Karakoram Capital', initials: 'ZA', content: 'Sent you an NDA request for access to the financial model and cohort analysis.', likes: 5 },
 ]
+
+function generateInitialComments(post: Post): CommentItem[] {
+  const targetCount = post.comments && post.comments > 0 ? post.comments : 3
+  const items: CommentItem[] = []
+  
+  for (let i = 0; i < targetCount; i++) {
+    const template = SEED_COMMENT_TEMPLATES[i % SEED_COMMENT_TEMPLATES.length]
+    const cycle = Math.floor(i / SEED_COMMENT_TEMPLATES.length)
+    const suffix = cycle > 0 ? ` (${cycle + 1})` : ''
+    const minutesAgo = (i + 1) * 6
+    const timeStr = minutesAgo < 60 ? `${minutesAgo}m ago` : `${Math.floor(minutesAgo / 60)}h ago`
+    
+    items.push({
+      id: `c-${post.id}-${i + 1}`,
+      name: `${template.name}${suffix}`,
+      role: template.role,
+      headline: template.headline,
+      time: timeStr,
+      initials: template.initials,
+      content: template.content,
+      likes: template.likes,
+      isReply: template.isReply,
+      replyTo: template.replyTo,
+    })
+  }
+  return items
+}
 
 export function PostCard({
   post,
@@ -100,12 +117,17 @@ export function PostCard({
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [comments, setComments] = useState<CommentItem[]>(DEFAULT_COMMENTS)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [activeSlide, setActiveSlide] = useState(0)
+  const [comments, setComments] = useState<CommentItem[]>(() => generateInitialComments(post))
+  const [visibleCommentCount, setVisibleCommentCount] = useState(3)
   const [commentText, setCommentText] = useState('')
   const [requested, setRequested] = useState(false)
   const [requesting, setRequesting] = useState(false)
   const [connectedUsers, setConnectedUsers] = useState<Record<string, boolean>>({})
 
+  const incrementCommentCount = useFeedStore((state) => state.incrementCommentCount)
+  const postImages = post.images && post.images.length > 0 ? post.images : post.imageUrl ? [post.imageUrl] : []
   const count = post.interested
 
   function requestRoom() {
@@ -136,6 +158,8 @@ export function PostCard({
       likes: 0,
     }
     setComments((prev) => [newComment, ...prev])
+    setVisibleCommentCount((prev) => prev + 1)
+    incrementCommentCount(post.id)
     setCommentText('')
     toast.success('Comment posted')
   }
@@ -316,7 +340,33 @@ export function PostCard({
               </div>
             </>
           ) : (
-            <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{post.body}</p>
+            <div>
+              {!isExpanded && (postImages.length > 0 ? post.body.length > 70 : post.body.length > 200) ? (
+                <p className="break-words [overflow-wrap:anywhere]">
+                  {post.body.slice(0, postImages.length > 0 ? 68 : 180).trim()}…{' '}
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(true)}
+                    className="font-semibold text-[#64748B] hover:text-[#14213D] hover:underline"
+                  >
+                    more
+                  </button>
+                </p>
+              ) : (
+                <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                  {post.body}
+                  {isExpanded && (postImages.length > 0 ? post.body.length > 70 : post.body.length > 200) && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExpanded(false)}
+                      className="ml-2 font-semibold text-[#64748B] hover:text-[#14213D] hover:underline"
+                    >
+                      less
+                    </button>
+                  )}
+                </p>
+              )}
+            </div>
           )}
 
           {/* Tags */}
@@ -330,16 +380,81 @@ export function PostCard({
             </div>
           )}
 
-          {/* Uploaded or Attached Image - Full uncropped view */}
-          {post.imageUrl && (
+          {/* Uploaded or Attached Images - LinkedIn Carousel or Single Image */}
+          {postImages.length > 1 ? (
+            <div className="relative mt-3 overflow-hidden rounded-xl border border-[#E2E8F0] bg-black shadow-sm select-none group">
+              {/* Top-Right Page Counter (e.g. 7/7) */}
+              <div className="absolute top-3 right-3 z-20 rounded-md bg-black/75 px-2.5 py-0.5 text-[11px] font-bold text-white shadow backdrop-blur-sm pointer-events-none">
+                {activeSlide + 1}/{postImages.length}
+              </div>
+
+              {/* Previous Image Button */}
+              {activeSlide > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveSlide((prev) => Math.max(0, prev - 1))
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 z-20 flex size-9 items-center justify-center rounded-full bg-black/70 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-black/90 hover:scale-105 active:scale-95"
+                  aria-label="Previous slide"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+              )}
+
+              {/* Next Image Button */}
+              {activeSlide < postImages.length - 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActiveSlide((prev) => Math.min(postImages.length - 1, prev + 1))
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex size-9 items-center justify-center rounded-full bg-black/70 text-white shadow-lg backdrop-blur-sm transition-all hover:bg-black/90 hover:scale-105 active:scale-95"
+                  aria-label="Next slide"
+                >
+                  <ChevronRight className="size-5" />
+                </button>
+              )}
+
+              {/* Active Slide Image */}
+              <div className="flex w-full min-h-[280px] max-h-[520px] items-center justify-center bg-black/95">
+                <img
+                  src={postImages[activeSlide]}
+                  alt={`Attachment ${activeSlide + 1} of ${postImages.length}`}
+                  className="max-h-[520px] w-full object-contain"
+                />
+              </div>
+
+              {/* Carousel Dot Indicators */}
+              <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 backdrop-blur-sm">
+                {postImages.map((_, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setActiveSlide(idx)
+                    }}
+                    className={cn(
+                      'h-1.5 rounded-full transition-all',
+                      idx === activeSlide ? 'w-4 bg-white' : 'w-1.5 bg-white/50 hover:bg-white/80'
+                    )}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : postImages.length === 1 ? (
             <div className="mt-3 overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#F8FAFC] shadow-sm">
               <img
-                src={post.imageUrl}
+                src={postImages[0]}
                 alt={post.imageName ?? 'Post media attachment'}
                 className="max-h-[520px] w-full object-contain rounded-xl"
               />
             </div>
-          )}
+          ) : null}
 
           {/* Special Deal Banner */}
           {post.banner === 'deal' && !post.imageUrl && (
@@ -454,7 +569,7 @@ export function PostCard({
 
             {/* Comment Thread */}
             <div className="space-y-3.5">
-              {comments.map((c) => {
+              {comments.slice(0, visibleCommentCount).map((c) => {
                 const isUserConnected = connectedUsers[c.id]
                 const isCommentSelf =
                   (currentFullName !== '' && c.name.toLowerCase() === currentFullName) ||
@@ -566,15 +681,34 @@ export function PostCard({
               })}
             </div>
 
-            {/* Show More link */}
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => toast('All comments loaded')}
-                className="text-xs font-semibold text-[#3F4FA0] hover:underline"
-              >
-                Show more ▼
-              </button>
-            </div>
+            {/* Bottom-Left Incremental "See more comments" */}
+            {comments.length > visibleCommentCount ? (
+              <div className="mt-3.5 flex items-center justify-between text-left">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCommentCount((prev) => Math.min(prev + 7, comments.length))}
+                  className="text-xs font-semibold text-[#3F4FA0] hover:text-[#14213D] hover:underline transition-colors"
+                >
+                  See {comments.length - visibleCommentCount} more comment{comments.length - visibleCommentCount === 1 ? '' : 's'}
+                </button>
+                <span className="text-[11px] text-[#94A3B8]">
+                  {visibleCommentCount} of {comments.length}
+                </span>
+              </div>
+            ) : comments.length > 3 ? (
+              <div className="mt-3.5 flex items-center justify-between text-left">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCommentCount(3)}
+                  className="text-xs font-semibold text-[#64748B] hover:text-[#14213D] hover:underline transition-colors"
+                >
+                  Show less
+                </button>
+                <span className="text-[11px] text-[#94A3B8]">
+                  All {comments.length} comments shown
+                </span>
+              </div>
+            ) : null}
           </div>
         )}
       </article>

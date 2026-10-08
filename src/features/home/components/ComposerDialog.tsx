@@ -13,6 +13,7 @@ import {
   Smile,
   Sparkles,
   Users,
+  Video,
   X,
   ZoomIn,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useJoinStore } from "@/features/join/useJoinStore";
+import { useProfileStore } from "@/features/profile/useProfileStore";
 import { cn } from "@/lib/utils";
 import type { Post } from "../types";
 
@@ -131,15 +133,21 @@ export function ComposerDialog({
   initialPost,
   quotedPost,
 }: ComposerDialogProps) {
+  const profileStore = useProfileStore((state) => state.profile);
+  const avatarUrl = profileStore?.avatarUrl;
+
   const [text, setText] = useState("");
   const [audience, setAudience] = useState<AudienceId>("public");
   const [images, setImages] = useState<AttachedImage[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoName, setVideoName] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,9 +186,13 @@ export function ComposerDialog({
           });
         }
         setImages(loadedImages);
+        setVideoUrl(initialPost.videoUrl || null);
+        setVideoName(initialPost.videoName || null);
       } else {
         setText("");
         setImages([]);
+        setVideoUrl(null);
+        setVideoName(null);
       }
       setAudience("public");
       setIsPosting(false);
@@ -265,7 +277,25 @@ export function ComposerDialog({
     }
   };
 
-  const canPost = (text.trim().length > 0 || images.length > 0 || Boolean(quotedPost)) && !isPosting;
+  const handleVideoFile = (file?: File) => {
+    if (!file) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Video must be smaller than 50 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setVideoUrl(String(e.target?.result || ""));
+      setVideoName(file.name);
+      toast.success("Video attached successfully");
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read video file");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const canPost = (text.trim().length > 0 || images.length > 0 || Boolean(videoUrl) || Boolean(quotedPost)) && !isPosting;
 
   function handlePublish() {
     if (!canPost) return;
@@ -287,6 +317,8 @@ export function ComposerDialog({
         images: images.map((img) => img.dataUrl),
         imageUrl: images[0]?.dataUrl,
         imageName: images.length > 1 ? `${images.length} photos` : images[0]?.name,
+        videoUrl: videoUrl || undefined,
+        videoName: videoName || undefined,
         interested: initialPost?.interested || 0,
         comments: initialPost?.comments || 0,
         engagementScore: initialPost?.engagementScore || 100,
@@ -314,8 +346,12 @@ export function ComposerDialog({
         <div className="flex shrink-0 items-start justify-between pb-3.5 border-b border-[#F1F5F9]">
           <div className="flex items-center gap-3 min-w-0">
             {/* 44px Circular Avatar */}
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-sm font-bold text-white shadow-sm ring-2 ring-[#E2E8F0]">
-              {initials}
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-sm font-bold text-white shadow-sm ring-2 ring-[#E2E8F0] overflow-hidden">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={author} className="size-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
 
             {/* Author Name and Sub-row Dropdown */}
@@ -499,6 +535,28 @@ export function ComposerDialog({
             </div>
           )}
 
+          {/* Attached Video Preview */}
+          {videoUrl && (
+            <div className="relative mt-3 overflow-hidden rounded-xl border border-[#E2E8F0] bg-black">
+              <video
+                src={videoUrl}
+                controls
+                className="max-h-[360px] w-full object-contain"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setVideoUrl(null);
+                  setVideoName(null);
+                }}
+                className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-full bg-black/75 text-white hover:bg-red-600 transition-colors shadow z-10 cursor-pointer"
+                aria-label="Remove video"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          )}
+
           {/* Quoted Post Card Preview in Composer */}
           {quotedPost && (
             <div className="mt-3 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-left">
@@ -677,6 +735,26 @@ export function ComposerDialog({
               <ImageIcon className="size-5" />
             </button>
 
+            {/* Video Picker */}
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/ogg"
+              className="hidden"
+              onChange={(e) => {
+                handleVideoFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => videoInputRef.current?.click()}
+              title="Attach video"
+              className="flex size-9 items-center justify-center rounded-lg text-[#64748B] transition-colors hover:bg-[#F1F5F9] hover:text-[#14213D]"
+            >
+              <Video className="size-5" />
+            </button>
+
             {/* Milestone / Celebrate Deal */}
             <button
               type="button"
@@ -755,18 +833,24 @@ export function ComposerCard({
   onOpen: (preset?: string) => void;
   initials?: string;
 }) {
-  const profile = useJoinStore((state) => state.profile);
-  const firstName = profile?.firstName || "Tariq";
-  const lastName = profile?.lastName || "Mansoor";
+  const profileStore = useProfileStore((state) => state.profile);
+  const joinProfile = useJoinStore((state) => state.profile);
+  const firstName = profileStore?.firstName || joinProfile?.firstName || "Syeda Zahra";
+  const lastName = profileStore?.lastName || joinProfile?.lastName || "Ijaz";
   const userInitials =
     initials ||
-    `${firstName[0] ?? "T"}${lastName[0] ?? "M"}`.toUpperCase();
+    `${firstName[0] ?? "Z"}${lastName[0] ?? "I"}`.toUpperCase();
+  const avatarUrl = profileStore?.avatarUrl;
 
   return (
     <section className="rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-[0_3px_14px_rgba(20,33,61,0.06)] sm:p-5">
       <div className="flex items-center gap-3">
-        <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-[#14213D] text-xs font-bold text-white">
-          {userInitials}
+        <span className="relative grid size-10 shrink-0 place-items-center rounded-full bg-[#14213D] text-xs font-bold text-white overflow-hidden ring-1 ring-slate-200">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={firstName} className="size-full object-cover" />
+          ) : (
+            userInitials
+          )}
           <i className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-white bg-[#5BA4E6]" />
         </span>
         <button

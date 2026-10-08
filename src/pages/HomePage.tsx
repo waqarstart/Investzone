@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useJoinStore } from '@/features/join/useJoinStore'
+import { useProfileStore } from '@/features/profile/useProfileStore'
 import { useFeedStore } from '@/features/home/useFeedStore'
 import type { Post } from '@/features/home/types'
 import { ComposerCard, ComposerDialog } from '@/features/home/components/ComposerDialog'
@@ -15,10 +16,12 @@ import {
 } from '@/features/home/components/Sidebar'
 
 export default function HomePage() {
-  const profile = useJoinStore((state) => state.profile)
-  const firstName = profile?.firstName || 'Tariq'
-  const lastName = profile?.lastName || 'Mansoor'
-  const initials = `${firstName[0] ?? 'T'}${lastName[0] ?? 'M'}`.toUpperCase()
+  const profileStore = useProfileStore((state) => state.profile)
+  const joinProfile = useJoinStore((state) => state.profile)
+  const firstName = profileStore?.firstName || joinProfile?.firstName || 'Syeda Zahra'
+  const lastName = profileStore?.lastName || joinProfile?.lastName || 'Ijaz'
+  const initials = `${firstName[0] ?? 'Z'}${lastName[0] ?? 'I'}`.toUpperCase()
+  const role = profileStore?.role || joinProfile?.role || 'founder'
 
   const items = useFeedStore((state) => state.posts)
   const hidden = useFeedStore((state) => state.hiddenIds)
@@ -106,7 +109,7 @@ export default function HomePage() {
 
         <aside
           aria-label="Recommendations and notifications"
-          className="min-w-0 space-y-5 lg:sticky lg:top-[104px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pb-2"
+          className="min-w-0 space-y-5 lg:sticky lg:top-[104px] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:overscroll-contain no-scrollbar lg:pb-2"
         >
           <div className="hidden space-y-5 lg:block">
             <SuggestedCard />
@@ -126,7 +129,7 @@ export default function HomePage() {
         onOpenChange={setComposerOpen}
         author={`${firstName} ${lastName}`}
         initials={initials}
-        role={profile?.role === 'investor' ? 'Investor' : 'Founder'}
+        role={role === 'investor' ? 'Investor' : 'Founder'}
         preset={composerPreset}
         onPost={(post: Post) => addPost(post)}
       />

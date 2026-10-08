@@ -39,6 +39,8 @@ export interface Post {
   imageUrl?: string
   images?: string[]
   imageName?: string
+  videoUrl?: string
+  videoName?: string
   banner?: 'deal' | 'celebration'
   reposts?: number
   repostedBy?: string

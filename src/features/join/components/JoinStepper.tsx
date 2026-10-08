@@ -1,27 +1,91 @@
-import { Check } from "lucide-react"
-import { STEPS } from "@/features/join/steps"
-import { cn } from "@/lib/utils"
+import { Check, Minus } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { cn } from "@/lib/utils";
+import { STEPS, type StepKey, type StepStatus } from "../steps";
 
-interface JoinStepperProps { activeIndex: number; completedCount: number; onSelectStep: (index: number) => void }
+interface JoinStepperProps {
+  caption: string;
+  activeIndex: number;
+  statuses: Record<StepKey, StepStatus>;
+  canSelect: (index: number) => boolean;
+  onSelect: (index: number) => void;
+}
 
-export function JoinStepper({ activeIndex, completedCount, onSelectStep }: JoinStepperProps) {
-  const currentIndex = activeIndex < 0 ? STEPS.length - 1 : activeIndex
-  const finished = activeIndex < 0
-  return <section className="mx-auto max-w-[840px] text-center" aria-label="Registration progress">
-    <p className="text-sm font-semibold uppercase tracking-[0.1em] text-[#64748B]">Step {finished ? 6 : currentIndex + 1} of 6 · Takes less than 2 minutes</p>
-    <ol className="relative mt-6 grid grid-cols-6">
-      <span className="absolute left-[8.33%] right-[8.33%] top-5 h-0.5 bg-[#E5E7EB]" aria-hidden="true" />
-      <span className="absolute left-[8.33%] top-5 h-0.5 bg-[#F5B544] transition-all" style={{ width: `${finished ? 83.34 : currentIndex * 16.67}%` }} aria-hidden="true" />
-      {STEPS.map((step, index) => {
-        const isDone = finished || index < completedCount
-        const isActive = !finished && index === activeIndex
-        return <li key={step.id} className="relative z-10 flex min-w-0 flex-col items-center">
-          <button type="button" disabled={!isDone} onClick={() => isDone && onSelectStep(index)} aria-current={isActive ? "step" : undefined} aria-label={`${step.label}${isDone ? ", completed, go back" : isActive ? ", current step" : ", upcoming step"}`} className={cn("grid size-10 place-items-center rounded-full text-sm font-semibold transition-all max-sm:size-8", isDone && "bg-[#F5B544] text-[#14213D]", isActive && "bg-[#F5B544] text-[#14213D] shadow-[0_0_0_6px_rgba(245,181,68,0.25)]", !isDone && !isActive && "bg-[#E5E7EB] text-[#64748B]", isDone && "cursor-pointer")}>
-            {isDone ? <Check className="size-4" strokeWidth={2.5} /> : index + 1}
-          </button>
-          <span className={cn("mt-2 hidden whitespace-nowrap text-xs sm:block", isActive ? "font-bold text-[#14213D]" : isDone ? "text-[#14213D]" : "text-[#64748B]", isActive && "max-sm:block")}>{step.label}</span>
-        </li>
-      })}
-    </ol>
-  </section>
+export function JoinStepper({ caption, activeIndex, statuses, canSelect, onSelect }: JoinStepperProps) {
+  const reduced = useReducedMotion();
+  const activeLabel = STEPS[activeIndex]?.label;
+
+  return (
+    <div>
+      <p className="mb-6 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 sm:text-sm">
+        {caption}
+      </p>
+
+      <nav aria-label="KYC progress">
+        <ol className="mx-auto flex w-full max-w-[980px] items-start">
+          {STEPS.map((step, index) => {
+            const status = statuses[step.key];
+            const active = index === activeIndex;
+            const done = status === "completed";
+            const skipped = status === "skipped";
+            const selectable = !active && canSelect(index);
+            const previousDone = index > 0 && statuses[STEPS[index - 1].key] === "completed";
+
+            return (
+              <li key={step.key} className="relative flex flex-1 flex-col items-center">
+                {index > 0 && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute left-[-50%] right-[50%] top-[19px] h-0.5 bg-[#E5E7EB]"
+                  >
+                    <motion.span
+                      className="block h-full bg-[#F5B544]"
+                      initial={false}
+                      animate={{ width: previousDone ? "100%" : "0%" }}
+                      transition={{ duration: reduced ? 0 : 0.4 }}
+                    />
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!selectable}
+                  onClick={() => onSelect(index)}
+                  aria-current={active ? "step" : undefined}
+                  aria-label={`${step.label}${done ? ", completed" : skipped ? ", skipped" : ""}`}
+                  className={cn(
+                    "relative z-10 flex size-10 items-center justify-center rounded-full text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#F5B544]/40",
+                    done || active ? "bg-[#F5B544] text-[#14213D]" : "bg-[#E5E7EB] text-slate-500",
+                    active && "shadow-[0_0_0_8px_rgba(245,181,68,0.25)]",
+                    selectable ? "cursor-pointer hover:brightness-95" : "cursor-default",
+                  )}
+                >
+                  {done ? (
+                    <Check className="size-5" aria-hidden="true" />
+                  ) : skipped ? (
+                    <Minus className="size-5" aria-hidden="true" />
+                  ) : (
+                    index + 1
+                  )}
+                </button>
+
+                <span
+                  className={cn(
+                    "mt-3 hidden px-1 text-center text-xs leading-4 sm:block sm:text-sm",
+                    active ? "font-semibold text-[#14213D]" : "text-slate-500",
+                  )}
+                >
+                  {step.label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+
+      {activeLabel && (
+        <p className="mt-3 text-center text-sm font-semibold text-[#14213D] sm:hidden">{activeLabel}</p>
+      )}
+    </div>
+  );
 }

@@ -4,7 +4,7 @@ import { Logo } from "@/components/auth/Logo"
 export function JoinHeader() {
   return (
     <header className="w-full border-b border-[#E5E7EB] bg-white">
-      <div className="mx-auto flex h-20 w-full max-w-[1380px] items-center justify-between px-6 md:h-[100px] md:px-12">
+      <div className="mx-auto flex h-20 w-full max-w-[1380px] items-center justify-between px-6 md:h-[65px] md:px-12">
         <Logo size={44} wordmarkSize="text-[28px]" />
 
         <div className="flex items-center gap-2 text-sm text-[#475569]">

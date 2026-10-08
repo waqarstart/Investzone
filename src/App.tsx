@@ -9,6 +9,8 @@ import OpportunitiesPage from "./pages/OpportunitiesPage";
 import PodcastsPage from "./pages/PodcastsPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import CommunicationsPage from "./pages/CommunicationsPage";
+import ProfilePage from "./pages/ProfilePage";
+import EditProfilePage from "./pages/EditProfilePage";
 
 const App = () => (
   <BrowserRouter>
@@ -24,6 +26,8 @@ const App = () => (
         <Route path="/podcasts" element={<PodcastsPage />} />
         <Route path="/communications" element={<CommunicationsPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/edit" element={<EditProfilePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

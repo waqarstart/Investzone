@@ -1,63 +1,65 @@
-import { ArrowUpRight, Eye, LineChart, Search } from 'lucide-react'
+import { BarChart2, Eye, Search, Users } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function ProfileAnalyticsCard() {
   return (
     <article className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white p-5 sm:p-6 shadow-[0_3px_14px_rgba(20,33,61,0.06)]">
-      {/* Title */}
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-base font-bold text-[#14213D]">Analytics</h2>
+      {/* Title & Private Indicator */}
+      <h2 className="text-base font-bold text-[#14213D]">Analytics</h2>
+      <div className="flex items-center gap-1.5 text-xs text-[#64748B] mt-0.5 mb-4">
+        <Eye className="size-3.5 text-[#64748B]" />
+        <span>Private to you</span>
       </div>
-      <p className="text-xs text-[#64748B] mb-4">Past 90 days engagement telemetry</p>
 
-      {/* 3 Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-        {/* Profile Views */}
+      {/* Analytics 3 Column Row (LinkedIn Exact Format) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-4 pt-1">
+        {/* 1. Profile views */}
         <div
-          onClick={() => toast.info('142 founders and investors viewed your profile this month')}
-          className="group rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 hover:border-[#3F4FA0] hover:bg-white transition-all cursor-pointer"
+          onClick={() => toast.info('145 people viewed your profile recently')}
+          className="flex items-start gap-3 group cursor-pointer"
         >
-          <div className="flex items-center justify-between text-[#64748B] mb-1.5">
-            <Eye className="size-4 text-[#3F4FA0]" />
-            <span className="text-[10px] font-bold text-emerald-600 flex items-center">
-              +18% <ArrowUpRight className="size-3" />
-            </span>
+          <Users className="size-5 shrink-0 text-[#14213D] mt-0.5" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-[#14213D] group-hover:text-[#0a66c2] group-hover:underline transition-colors">
+              145 profile views
+            </h3>
+            <p className="text-xs text-[#64748B] mt-0.5 leading-relaxed">
+              Discover who&apos;s viewed your profile.
+            </p>
           </div>
-          <p className="text-lg font-bold text-[#14213D] tracking-tight">142</p>
-          <p className="text-xs font-semibold text-[#475569] mt-0.5">Profile views</p>
-          <p className="text-[10px] text-[#94A3B8] mt-1">Discover who viewed your mandate</p>
         </div>
 
-        {/* Post Impressions */}
+        {/* 2. Post impressions */}
         <div
-          onClick={() => toast.info('Your posts gained 2,480 impressions across feed')}
-          className="group rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 hover:border-[#3F4FA0] hover:bg-white transition-all cursor-pointer"
+          onClick={() => toast.info('Your posts gained 110 impressions in the past 7 days')}
+          className="flex items-start gap-3 group cursor-pointer"
         >
-          <div className="flex items-center justify-between text-[#64748B] mb-1.5">
-            <LineChart className="size-4 text-[#F5B544]" />
-            <span className="text-[10px] font-bold text-emerald-600 flex items-center">
-              +32% <ArrowUpRight className="size-3" />
-            </span>
+          <BarChart2 className="size-5 shrink-0 text-[#14213D] mt-0.5" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-[#14213D] group-hover:text-[#0a66c2] group-hover:underline transition-colors">
+              110 post impressions
+            </h3>
+            <p className="text-xs text-[#64748B] mt-0.5 leading-relaxed">
+              Check out who&apos;s engaging with your posts.
+            </p>
+            <p className="text-[11px] text-[#94A3B8] mt-0.5">Past 7 days</p>
           </div>
-          <p className="text-lg font-bold text-[#14213D] tracking-tight">2,480</p>
-          <p className="text-xs font-semibold text-[#475569] mt-0.5">Post impressions</p>
-          <p className="text-[10px] text-[#94A3B8] mt-1">Check feed engagement & reach</p>
         </div>
 
-        {/* Search Appearances */}
+        {/* 3. Search appearances */}
         <div
-          onClick={() => toast.info('You appeared in 48 search queries for your sector')}
-          className="group rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-3.5 hover:border-[#3F4FA0] hover:bg-white transition-all cursor-pointer"
+          onClick={() => toast.info('You appeared in 9 search results this week')}
+          className="flex items-start gap-3 group cursor-pointer"
         >
-          <div className="flex items-center justify-between text-[#64748B] mb-1.5">
-            <Search className="size-4 text-[#7C5CBF]" />
-            <span className="text-[10px] font-bold text-emerald-600 flex items-center">
-              +9% <ArrowUpRight className="size-3" />
-            </span>
+          <Search className="size-5 shrink-0 text-[#14213D] mt-0.5" />
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-[#14213D] group-hover:text-[#0a66c2] group-hover:underline transition-colors">
+              9 search appearances
+            </h3>
+            <p className="text-xs text-[#64748B] mt-0.5 leading-relaxed">
+              See how often you appear in search results.
+            </p>
           </div>
-          <p className="text-lg font-bold text-[#14213D] tracking-tight">48</p>
-          <p className="text-xs font-semibold text-[#475569] mt-0.5">Search appearances</p>
-          <p className="text-[10px] text-[#94A3B8] mt-1">See how often you appear in search</p>
         </div>
       </div>
     </article>

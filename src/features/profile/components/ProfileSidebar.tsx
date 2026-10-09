@@ -23,6 +23,7 @@ const SUGGESTED_PEERS = [
     company: 'Meridian Ventures',
     initials: 'MV',
     badge: 'Investor · $15M',
+    memberId: 'marcus_v',
   },
   {
     name: 'Dr Aamir Mehmood',
@@ -30,6 +31,7 @@ const SUGGESTED_PEERS = [
     company: 'HealthBridge AI',
     initials: 'AM',
     badge: 'Series A',
+    memberId: 'dr_aamir',
   },
   {
     name: 'Zainab Bilal',
@@ -51,6 +53,7 @@ const SUGGESTED_PEERS = [
     company: 'Falcon Syndicate',
     initials: 'SJ',
     badge: 'Investor',
+    memberId: 'sarah_j',
   },
   {
     name: 'Kamran Shafi',
@@ -68,17 +71,30 @@ const SUGGESTED_PEERS = [
   },
 ]
 
-export function ProfileSidebar() {
-  const profile = useProfileStore((state) => state.profile)
+interface ProfileSidebarProps {
+  member?: {
+    name: string
+    role: 'Founder' | 'Investor'
+    id: string
+  }
+}
+
+export function ProfileSidebar({ member }: ProfileSidebarProps = {}) {
+  const currentProfile = useProfileStore((state) => state.profile)
   const [connected, setConnected] = useState<Record<string, boolean>>({})
 
-  const publicUrl = `https://bridgeway.com/in/${profile.firstName.toLowerCase().replace(/\s+/g, '-')}-${profile.lastName.toLowerCase()}`
+  const publicUrl = member
+    ? `https://bridgeway.com/in/${member.name.toLowerCase().replace(/\s+/g, '-')}`
+    : `https://bridgeway.com/in/${currentProfile.firstName.toLowerCase().replace(/\s+/g, '-')}-${currentProfile.lastName.toLowerCase()}`
+
+  const isOtherMember = !!member
+  const isFounder = member ? member.role === 'Founder' : currentProfile.role === 'founder'
 
   function handleCopyLink() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(publicUrl)
     }
-    toast.success('Public profile link copied to clipboard!')
+    toast.success(isOtherMember ? `${member.name}'s profile link copied!` : 'Public profile link copied to clipboard!')
   }
 
   return (
@@ -91,24 +107,32 @@ export function ProfileSidebar() {
             <span>Profile Strength</span>
           </span>
           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-            All-Star · 92%
+            {isOtherMember ? 'All-Star · 98%' : 'All-Star · 92%'}
           </span>
         </div>
 
         {/* Progress bar */}
         <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden my-2">
-          <div className="h-full bg-gradient-to-r from-[#F5B544] via-[#3F4FA0] to-emerald-500 w-[92%] rounded-full transition-all" />
+          <div
+            className={`h-full bg-gradient-to-r from-[#F5B544] via-[#3F4FA0] to-emerald-500 rounded-full transition-all ${
+              isOtherMember ? 'w-[98%]' : 'w-[92%]'
+            }`}
+          />
         </div>
 
         <p className="text-[11px] text-[#64748B] leading-relaxed mt-2">
-          Your profile ranks in the top 5% of verified founders on Bridgeway.
+          {isOtherMember
+            ? `${member.name} ranks in the top 3% of verified ${isFounder ? 'founders' : 'investors'} on Bridgeway.`
+            : `Your profile ranks in the top 5% of verified ${isFounder ? 'founders' : 'investors'} on Bridgeway.`}
         </p>
       </section>
 
       {/* 2. PUBLIC PROFILE & URL BOX */}
       <section className="overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white p-5 shadow-[0_3px_14px_rgba(20,33,61,0.06)]">
         <h3 className="text-xs font-bold text-[#14213D] mb-1">Public Profile & URL</h3>
-        <p className="text-[11px] text-[#64748B] mb-3">Share your verified profile with co-investors & LPs</p>
+        <p className="text-[11px] text-[#64748B] mb-3">
+          {isOtherMember ? `Share ${member.name}'s verified profile` : 'Share your verified profile with co-investors & LPs'}
+        </p>
 
         <div className="flex items-center justify-between rounded-xl border border-[#CBD5E1]/70 bg-[#F8FAFC] px-3 py-2 text-xs">
           <span className="truncate max-w-[190px] font-mono text-[11px] text-[#334155]">
@@ -138,11 +162,31 @@ export function ProfileSidebar() {
             return (
               <div key={peer.name} className="flex items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-xs font-bold text-white shadow-xs">
-                    {peer.initials}
-                  </div>
+                  {peer.memberId ? (
+                    <Link
+                      to={`/profile/member/${peer.memberId}`}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-xs font-bold text-white shadow-xs hover:ring-2 hover:ring-[#3F4FA0]/40 transition-all cursor-pointer"
+                      title={`View ${peer.name}'s profile`}
+                    >
+                      {peer.initials}
+                    </Link>
+                  ) : (
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-xs font-bold text-white shadow-xs">
+                      {peer.initials}
+                    </div>
+                  )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-bold text-[#14213D]">{peer.name}</p>
+                    {peer.memberId ? (
+                      <Link
+                        to={`/profile/member/${peer.memberId}`}
+                        className="truncate text-xs font-bold text-[#14213D] hover:text-[#3F4FA0] hover:underline block transition-colors cursor-pointer"
+                        title={`View ${peer.name}'s profile`}
+                      >
+                        {peer.name}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-xs font-bold text-[#14213D]">{peer.name}</p>
+                    )}
                     <p className="truncate text-[10px] text-[#64748B]">{peer.role} · {peer.company}</p>
                   </div>
                 </div>

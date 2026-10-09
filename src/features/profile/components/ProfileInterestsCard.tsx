@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Bookmark, Check, DollarSign } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -288,20 +289,38 @@ export function ProfileInterestsCard() {
         </button>
       </div>
 
-      {/* Grid of Tracked Items */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-        {items.map((item) => {
+      {/* List of Tracked Items */}
+      <div className="divide-y divide-[#F1F5F9] space-y-4 pt-3">
+        {items.map((item, idx) => {
           const isTracked = !!trackingMap[item.id]
 
           return (
             <div
               key={item.id}
-              className="flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-[#F8FAFC]/60 p-4 transition-all hover:border-[#3F4FA0]/60 hover:bg-white hover:shadow-xs"
+              className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${idx > 0 ? 'pt-4' : ''}`}
             >
-              <div className="flex items-start gap-3 min-w-0">
+              <div className="flex items-start gap-3.5 min-w-0 flex-1">
                 {/* Emblem / Avatar */}
-                {item.avatar ? (
-                  <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-2xs">
+                {item.type === 'investor' ? (
+                  <Link
+                    to={`/profile/member/${item.id}`}
+                    className="relative size-11 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-2xs hover:opacity-90 hover:ring-2 hover:ring-[#3F4FA0]/30 transition-all cursor-pointer mt-0.5"
+                    title={`View ${item.name}'s profile`}
+                  >
+                    {item.avatar ? (
+                      <img
+                        src={item.avatar}
+                        alt={item.name}
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center bg-gradient-to-br from-[#14213D] to-[#3F4FA0] text-xs font-bold text-[#F5B544]">
+                        {item.initials}
+                      </div>
+                    )}
+                  </Link>
+                ) : item.avatar ? (
+                  <div className="relative size-11 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-2xs mt-0.5">
                     <img
                       src={item.avatar}
                       alt={item.name}
@@ -309,7 +328,7 @@ export function ProfileInterestsCard() {
                     />
                   </div>
                 ) : (
-                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#14213D] to-[#3F4FA0] text-xs font-bold text-[#F5B544] shadow-2xs">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#14213D] to-[#3F4FA0] text-xs font-bold text-[#F5B544] shadow-2xs mt-0.5">
                     {item.initials}
                   </div>
                 )}
@@ -317,9 +336,19 @@ export function ProfileInterestsCard() {
                 {/* Details */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h3 className="text-xs sm:text-sm font-bold text-[#14213D] truncate max-w-[190px]">
-                      {item.name}
-                    </h3>
+                    {item.type === 'investor' ? (
+                      <Link
+                        to={`/profile/member/${item.id}`}
+                        className="text-xs sm:text-sm font-bold text-[#14213D] hover:text-[#3F4FA0] hover:underline truncate max-w-[240px] transition-colors cursor-pointer"
+                        title={`View ${item.name}'s profile`}
+                      >
+                        {item.name}
+                      </Link>
+                    ) : (
+                      <h3 className="text-xs sm:text-sm font-bold text-[#14213D] truncate max-w-[240px]">
+                        {item.name}
+                      </h3>
+                    )}
                     <span
                       className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-bold ${
                         item.badgeColor || 'bg-slate-100 text-slate-700 border-slate-200'
@@ -333,7 +362,7 @@ export function ProfileInterestsCard() {
                     {item.subtitle}
                   </p>
 
-                  <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-[#14213D] bg-white border border-[#E2E8F0] px-2 py-0.5 rounded-md inline-flex max-w-full truncate">
+                  <div className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-[#14213D] bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-0.5 rounded-md inline-flex max-w-full truncate">
                     <DollarSign className="size-3 text-emerald-600 shrink-0" />
                     <span className="truncate">{item.metrics}</span>
                   </div>
@@ -341,17 +370,7 @@ export function ProfileInterestsCard() {
               </div>
 
               {/* Action Button */}
-              <div className="pt-3 mt-3 border-t border-[#F1F5F9] flex items-center justify-between">
-                <span className="text-[10px] text-[#94A3B8] font-medium">
-                  {item.type === 'fund'
-                    ? 'Syndicate Deal Flow'
-                    : item.type === 'startup'
-                    ? 'Seed / Series A Memo'
-                    : item.type === 'investor'
-                    ? 'Direct Allocation Desk'
-                    : 'Sector Macro Telemetry'}
-                </span>
-
+              <div className="flex items-center gap-3 shrink-0 sm:self-center pl-14 sm:pl-0">
                 <button
                   type="button"
                   onClick={() => toggleTrack(item)}

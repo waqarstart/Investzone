@@ -6,14 +6,12 @@ import { Button } from '@/components/ui/button'
 import { cn } from 'cn'
 import {
   CARD_SHADOW,
-  FEATURED_GRADIENT,
   featuredEpisode,
   formatClock,
   formatPlays,
 } from '../data'
 import type { PlayerTrack } from '../types'
 import { usePlayerStore } from '../usePlayerStore'
-import { WaveBackdrop } from './WaveBackdrop'
 
 const track: PlayerTrack = {
   id: featuredEpisode.id,
@@ -40,17 +38,19 @@ export function FeaturedEpisode() {
           CARD_SHADOW,
         )}
       >
-        <div
-          className="relative min-h-[280px] overflow-hidden aspect-video lg:aspect-auto lg:min-h-full"
-          style={{ backgroundImage: FEATURED_GRADIENT }}
-        >
-          <WaveBackdrop />
+        <div className="relative min-h-[280px] overflow-hidden aspect-video lg:aspect-auto lg:min-h-full bg-slate-950">
+          <img
+            src={`https://img.youtube.com/vi/${featuredEpisode.youtubeId || 'dGl9kYq5KKs'}/hqdefault.jpg`}
+            alt={featuredEpisode.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/30" />
           <div className="relative z-10 flex h-full w-full flex-wrap items-center justify-center gap-5 px-6 py-8 sm:gap-9 sm:px-8">
             <figure className="flex flex-col items-center gap-2">
-              <span className="relative inline-block rounded-full ring-4 ring-[#5BA4E6]">
+              <span className="relative inline-block rounded-full ring-4 ring-[#5BA4E6] shadow-md">
                 <Avatar name={featuredEpisode.hostName} size={avatarSize} tone="indigo" verified />
               </span>
-              <figcaption className="text-[11px] font-semibold tracking-wide text-white/85 uppercase">
+              <figcaption className="text-[11px] font-bold tracking-wide text-white uppercase drop-shadow-xs">
                 Host
               </figcaption>
             </figure>
@@ -58,20 +58,20 @@ export function FeaturedEpisode() {
               type="button"
               onClick={() => play(track)}
               aria-label={`Play ${featuredEpisode.title}`}
-              className="grid size-14 shrink-0 place-items-center rounded-full bg-[#F5B544] text-[#14213D] shadow-[0_0_30px_rgba(245,181,68,0.55)] transition-transform duration-200 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:size-[72px]"
+              className="grid size-14 shrink-0 place-items-center rounded-full bg-red-600 text-white shadow-[0_0_30px_rgba(220,38,38,0.7)] transition-transform duration-200 hover:scale-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:size-[72px]"
             >
-              <Play className="size-6 fill-current sm:size-8" />
+              <Play className="size-6 fill-current ml-0.5 sm:size-8" />
             </button>
             <figure className="flex flex-col items-center gap-2">
-              <span className="relative inline-block rounded-full ring-4 ring-[#F5B544]">
+              <span className="relative inline-block rounded-full ring-4 ring-[#F5B544] shadow-md">
                 <Avatar name={featuredEpisode.guestName} size={avatarSize} tone="navy" verified />
               </span>
-              <figcaption className="text-[11px] font-semibold tracking-wide text-white/85 uppercase">
+              <figcaption className="text-[11px] font-bold tracking-wide text-white uppercase drop-shadow-xs">
                 Guest
               </figcaption>
             </figure>
           </div>
-          <span className="absolute right-3 bottom-3 z-10 rounded-md bg-[rgba(20,33,61,0.75)] px-2 py-1 font-mono text-xs text-white">
+          <span className="absolute right-3 bottom-3 z-10 rounded-md bg-[rgba(20,33,61,0.85)] px-2 py-1 font-mono text-xs text-white">
             {formatClock(featuredEpisode.durationSeconds)}
           </span>
         </div>

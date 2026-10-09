@@ -8,7 +8,7 @@ export type ThumbShape = 'wave' | 'arc' | 'triangle' | 'circle'
 
 export type ThumbAccent = 'amber' | 'sky'
 
-export type SortKey = 'latest' | 'played' | 'longest'
+export type SortKey = 'most_viewed' | 'highest_rated' | 'trending' | 'latest'
 
 export type Category =
   | 'All'
@@ -29,6 +29,7 @@ export interface Episode {
   host: string
   role: PodcastRole
   plays: number
+  rating?: number
   publishedDaysAgo: number
   durationSeconds: number
   categories: Exclude<Category, 'All'>[]
@@ -36,6 +37,8 @@ export interface Episode {
   variant: ThumbnailVariant
   shape: ThumbShape
   accent: ThumbAccent
+  youtubeId?: string
+  description?: string
 }
 
 export interface FeaturedEpisode {
@@ -51,6 +54,7 @@ export interface FeaturedEpisode {
   plays: number
   topic: string
   icon: LucideIcon
+  youtubeId?: string
 }
 
 export interface ContinueItem {

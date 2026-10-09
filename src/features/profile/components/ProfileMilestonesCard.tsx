@@ -112,61 +112,57 @@ export function ProfileMilestonesCard() {
 
         {/* Milestone Cards Grid */}
         {milestones.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {milestones.map((item) => (
+          <div className="divide-y divide-[#F1F5F9] space-y-4">
+            {milestones.map((item, idx) => (
               <div
                 key={item.id}
-                className="group relative flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-gradient-to-br from-white to-[#F8FAFC] p-4 hover:border-[#3F4FA0] hover:shadow-sm transition-all"
+                className={`group flex items-start justify-between gap-3 ${idx > 0 ? 'pt-4' : ''}`}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#14213D]/5 border border-[#14213D]/10">
-                      {getCategoryIcon(item.category)}
-                    </div>
-                    <span className="text-[10px] font-semibold text-[#94A3B8]">{item.date}</span>
+                <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[#14213D]/5 border border-[#14213D]/10 mt-0.5">
+                    {getCategoryIcon(item.category)}
                   </div>
 
-                  <h3 className="text-xs sm:text-sm font-bold text-[#14213D] leading-snug break-words [overflow-wrap:anywhere]">
-                    {item.title}
-                  </h3>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm font-bold text-[#14213D] leading-snug break-words [overflow-wrap:anywhere]">
+                        {item.title}
+                      </h3>
+                      <span className="text-[11px] text-[#94A3B8] font-medium">{item.date}</span>
+                    </div>
 
-                  {item.description && (
-                    <p className="mt-1 text-xs text-[#64748B] line-clamp-2 leading-relaxed break-words [overflow-wrap:anywhere]">
-                      {item.description}
-                    </p>
-                  )}
+                    {item.metric && (
+                      <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-bold text-[#3F4FA0]">
+                        <Sparkles className="size-2.5 text-[#F5B544]" />
+                        <span>{item.metric}</span>
+                      </div>
+                    )}
+
+                    {item.description && (
+                      <p className="mt-1.5 text-xs text-[#475569] leading-relaxed break-words [overflow-wrap:anywhere]">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between pt-2.5 border-t border-[#F1F5F9]">
-                  {item.metric ? (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-[#EEF2FF] px-2 py-0.5 text-[10px] font-bold text-[#3F4FA0]">
-                      <Sparkles className="size-2.5 text-[#F5B544]" />
-                      <span>{item.metric}</span>
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-[#94A3B8] uppercase font-bold tracking-wider">
-                      {item.category}
-                    </span>
-                  )}
-
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(item)}
-                      title="Edit milestone"
-                      className="p-1 rounded text-[#94A3B8] hover:text-[#14213D] transition-colors"
-                    >
-                      <Edit3 className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item.id)}
-                      title="Delete milestone"
-                      className="p-1 rounded text-[#94A3B8] hover:text-[#EF4444] transition-colors"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(item)}
+                    title="Edit milestone"
+                    className="p-1 rounded text-[#94A3B8] hover:text-[#14213D] transition-colors"
+                  >
+                    <Edit3 className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item.id)}
+                    title="Delete milestone"
+                    className="p-1 rounded text-[#94A3B8] hover:text-[#EF4444] transition-colors"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
                 </div>
               </div>
             ))}

@@ -136,13 +136,10 @@ export function ProfileActivityCard() {
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-[#14213D]">Activity</h2>
-            <span className="rounded-full bg-[#EEF2FF] px-2.5 py-0.5 text-[10px] font-bold text-[#3730A3]">
-              {profile.followersCount} followers
-            </span>
-          </div>
-          <p className="text-xs text-[#64748B]">All discussions, raise announcements, and multimedia</p>
+          <h2 className="text-base font-bold text-[#14213D]">Activity</h2>
+          <p className="text-xs font-semibold text-[#3F4FA0]">
+            {profile.followersCount} followers
+          </p>
         </div>
 
         <Link

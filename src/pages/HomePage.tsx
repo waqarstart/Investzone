@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { useJoinStore } from '@/features/join/useJoinStore'
 import { useProfileStore } from '@/features/profile/useProfileStore'
@@ -32,18 +31,13 @@ export default function HomePage() {
 
   const [composerOpen, setComposerOpen] = useState(false)
   const [composerPreset, setComposerPreset] = useState('Pitch')
-  const [sort, setSort] = useState<'Top Deals & Matches' | 'Most recent'>('Top Deals & Matches')
 
   const visible = useMemo(
     () =>
       items
         .filter((post) => !hidden.includes(post.id))
-        .sort((a, b) =>
-          sort === 'Most recent'
-            ? (b.createdAt || 0) - (a.createdAt || 0)
-            : (b.engagementScore || 0) - (a.engagementScore || 0)
-        ),
-    [items, hidden, sort]
+        .sort((a, b) => (b.engagementScore || 0) - (a.engagementScore || 0)),
+    [items, hidden]
   )
 
   const openComposer = (preset = 'Pitch') => {
@@ -59,23 +53,7 @@ export default function HomePage() {
           <SuccessStories initials={initials} onShare={() => openComposer('Success story')} />
           <ComposerCard onOpen={openComposer} initials={initials} />
 
-          <div className="flex items-center justify-between gap-3 px-1 pt-1">
-            <div className="flex items-center gap-3 flex-1">
-              <span className="h-px flex-1 bg-[#E2E8F0]" />
-              <label className="text-xs text-[#64748B]">Sort by:</label>
-              <div className="relative">
-                <select
-                  value={sort}
-                  onChange={(event) => setSort(event.target.value as typeof sort)}
-                  className="appearance-none bg-transparent pr-5 text-xs font-bold text-[#14213D] outline-none cursor-pointer"
-                >
-                  <option>Top Deals & Matches</option>
-                  <option>Most recent</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-0 top-0.5 size-3" />
-              </div>
-            </div>
-          </div>
+
 
           <div className="space-y-5">
             {visible.map((post, index) => (

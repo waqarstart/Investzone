@@ -103,10 +103,7 @@ export function ProfileHeaderCard() {
             {/* 120px Circular Avatar with Camera Trigger */}
             <div className="relative group">
               <div
-                className={cn(
-                  'flex size-28 sm:size-32 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-3xl font-extrabold text-white shadow-xl ring-4 ring-white overflow-hidden',
-                  isFounder ? 'ring-[#F5B544]/50' : 'ring-[#3F4FA0]/50'
-                )}
+                className="flex size-28 sm:size-32 shrink-0 items-center justify-center rounded-full bg-[#14213D] text-3xl font-extrabold text-white shadow-xl ring-4 ring-white overflow-hidden"
               >
                 {profile.avatarUrl ? (
                   <img
@@ -155,7 +152,7 @@ export function ProfileHeaderCard() {
                   className="flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 shadow-2xs"
                 >
                   <CheckCircle2 className="size-3.5 text-emerald-600 fill-emerald-100" />
-                  <span>Verified {isFounder ? 'Founder' : 'Investor'}</span>
+                  <span>Verified</span>
                 </div>
               )}
 
